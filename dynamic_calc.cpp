@@ -78,13 +78,34 @@ bool Dynamic_calc::isLeftAssociative(const std::string &token) const {
     return true;
 };
 
+
+bool Dynamic_calc::isSeperator(char c) const {
+
+    return ops_.count(c) || unary_ops_.count(c) || c== '(' || c == ')';
+};
+
 std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) {
     std::queue<std::string> output_queue;
     std::stack<std::string> operator_stack;
 
-    std::stringstream ss(expression);
-    std::string token;
+    std::string prepared_expression;
+    for(size_t i = 0; i <expression.length();i++){
+        char c = expression[i];
 
+        if(isspace(c)){
+            prepared_expression += ' ';
+        }
+        else if (isSeperator(c)){
+            prepared_expression += ' ';
+            prepared_expression += c;
+            prepared_expression += ' ';
+        }else {
+            prepared_expression += c;
+        }
+    }
+
+    std::stringstream ss(prepared_expression);
+    std::string  token;
     while (ss >> token) {
 
         if (isNumber(token)) {
@@ -140,23 +161,25 @@ int main() {
     auto evaluate_result = calc_.Evaluate(expression);
     if (evaluate_result.err == CalcErr::None) {
         std::cout << "Result :" << evaluate_result.result.value() << "\n";
+    } else {
+        std::cerr << "Error:";
+        switch (evaluate_result.err) {
+            case CalcErr::DivideByZero :
+                std::cerr << "Can't Dividable by 0!";
+                break;
+            case CalcErr::IndeterminateResult :
+                std::cerr << "IndeterminateResult !";
+                break;
+            case CalcErr::OperationNotFound :
+                std::cerr << "Can't find the Obtained Operation";
+                break;
+            case CalcErr::NegativeRoot:
+                std::cerr << "Can not take sqrt of a negative number";
+            default:
+                std::cerr << "Unknown Error Occurred!";
+                break;
+        }
     }
-    std::cerr << "Error:";
-    switch (evaluate_result.err) {
-        case CalcErr::DivideByZero :
-            std::cerr << "Can't Dividable by 0!";
-            break;
-        case CalcErr::IndeterminateResult :
-            std::cerr << "IndeterminateResult !";
-            break;
-        case CalcErr::OperationNotFound :
-            std::cerr << "Can't find the Obtained Operation";
-            break;
-        case CalcErr::NegativeRoot:
-            std::cerr << "Can not take sqrt of a negative number";
-        default:
-            std::cerr << "Unknown Error Occurred!";
-            break;
-    }
+
     return 0;
 };

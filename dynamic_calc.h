@@ -65,10 +65,9 @@ private:
     std::shared_mutex mutex_s;
 
     bool isNumber(const std::string &token) const;
-
     Precedence get_precedence(const std::string &token) const;
-
     bool isLeftAssociative(const std::string &token) const;
+    bool isSeperator(char c)const;
 
     std::queue<std::string> ParseToRPN(const std::string &expression);
 
