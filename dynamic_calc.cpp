@@ -15,7 +15,7 @@ OperationResult Dynamic_calc::EvaluateRPN(std::queue<std::string> &rpn_queue) {
             } catch (std::exception &e) {
                 return {std::nullopt, CalcErr::ArgumentMismatch};
             }
-        } else if (ops_.count(token[0])) {
+        } else if (ops_.count(token)) {
             if (value_stack.size() < 2) {
                 return {std::nullopt, CalcErr::ArgumentMismatch};
             }
@@ -25,19 +25,19 @@ OperationResult Dynamic_calc::EvaluateRPN(std::queue<std::string> &rpn_queue) {
             value_stack.pop();
 
             std::vector<double> args = {val1, val2};
-            OperationResult op_res = ops_.at(token[0]).operation(args);
+            OperationResult op_res = ops_.at(token).operation(args);
             if (op_res.err != CalcErr::None) {
                 return op_res;
             }
             value_stack.push(op_res.result.value());
-        } else if (unary_ops_.count(token[0])) {
+        } else if (unary_ops_.count(token)) {
             if (value_stack.size() != 1) {
                 return {std::nullopt, CalcErr::ArgumentMismatch};
             }
             double val = value_stack.top();
             value_stack.pop();
             std::vector<double> args = {val};
-            OperationResult unary_op_res = unary_ops_.at(token[0]).operation(args);
+            OperationResult unary_op_res = unary_ops_.at(token).operation(args);
             if (unary_op_res.err != CalcErr::None) {
                 return unary_op_res;
             }
@@ -61,7 +61,7 @@ bool Dynamic_calc::isNumber(const std::string &token) const {
 
 Precedence Dynamic_calc::get_precedence(const std::string &token) const {
     if (token.length() != 1) return Precedence::None;
-    char op = token[0];
+    const std::string& op = token;
     if (ops_.count(op)) {
         return ops_.at(op).precedence;
     }
@@ -79,41 +79,35 @@ bool Dynamic_calc::isLeftAssociative(const std::string &token) const {
 };
 
 
-bool Dynamic_calc::isSeperator(char c) const {
-
-    return ops_.count(c) || unary_ops_.count(c) || c== '(' || c == ')';
-};
-
 std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) {
     std::queue<std::string> output_queue;
     std::stack<std::string> operator_stack;
 
     std::string prepared_expression;
-    for(size_t i = 0; i <expression.length();i++){
-        char c = expression[i];
+    for (size_t i = 0; i < expression.length(); i++) {
+        char c= expression[i];
 
-        if(isspace(c)){
+        if (isspace(c)) {
             prepared_expression += ' ';
-        }
-        else if (isSeperator(c)){
+        } else if (isSeparator(c)) {
             prepared_expression += ' ';
             prepared_expression += c;
             prepared_expression += ' ';
-        }else {
+        } else {
             prepared_expression += c;
         }
     }
 
     std::stringstream ss(prepared_expression);
-    std::string  token;
+    std::string token;
     while (ss >> token) {
 
         if (isNumber(token)) {
             output_queue.push(token);
-        } else if (token.length() == 1 && unary_ops_.count(token[0])) {
+        } else if (token.length() == 1 && unary_ops_.count(token)) {
             operator_stack.push(token);
-        } else if (token.length() == 1 && ops_.count(token[0])) {
-            Precedence current_precedence = ops_.at(token[0]).precedence;
+        } else if (token.length() == 1 && ops_.count(token)) {
+            Precedence current_precedence = ops_.at(token).precedence;
 
 
             while (!operator_stack.empty() &&
@@ -153,9 +147,34 @@ std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) 
     return output_queue;
 };
 
+void Dynamic_calc::RegisterOperator(std::string op, const OperatorDetails &details) {
+    std::lock_guard<std::shared_mutex> lock(mutex_s);
+    ops_[op] = details;
+}
+
+bool Dynamic_calc::isSeparator(char c) const {
+    std::string s(1,c);
+    return ops_.count(s) || unary_ops_.count(s) || c == '(' || c == ')';
+};
+
+
 int main() {
-    std::string expression;
     Dynamic_calc calc_;
+
+    std::cout << "Adding New Run-Time operator 'm' (max) \n";
+
+    Operation max_op = [](const std::vector<double> &args) -> OperationResult {
+        if (args.size() != 2) {
+            return {std::nullopt, CalcErr::ArgumentMismatch};
+        }
+        double max_result = std::max(args[0], args[1]);
+        return {std::optional<double>(max_result), CalcErr::None};
+
+    };
+    OperatorDetails max_details = {max_op, Precedence::AddSub};
+    calc_.RegisterOperator("m", max_details);
+    std::cout << "Give it a try for max! \n";
+    std::string expression;
     std::cout << "Obtain an Expression\n";
     std::getline(std::cin, expression);
     auto evaluate_result = calc_.Evaluate(expression);

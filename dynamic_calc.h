@@ -30,7 +30,8 @@ enum class CalcErr {
     OperationNotFound,
     ArgumentMismatch,
     NegativeRoot,
-    LeftAssociative
+    LeftAssociative,
+    DomainError
 };
 
 struct OperationResult {
@@ -44,7 +45,7 @@ struct OperationResult {
 };
 
 enum class Precedence : int {
-    None = 0, AddSub = 1, MultiDiv = 2, Pow = 3, Mod = 2, Unary = 4
+    None = 0, AddSub = 1, MultiDiv = 2, Pow = 4, Mod = 2, Unary = 5, Trigo = 4, Hyper = 3
 };
 
 using Operation = std::function<OperationResult(const std::vector<double> &args)>;
@@ -60,14 +61,17 @@ struct UnaryOperatorDetails {
 
 class Dynamic_calc {
 private:
-    std::map<char, OperatorDetails> ops_;
-    std::map<char, UnaryOperatorDetails> unary_ops_;
+    std::map<std::string, OperatorDetails> ops_;
+    std::map<std::string, UnaryOperatorDetails> unary_ops_;
     std::shared_mutex mutex_s;
 
     bool isNumber(const std::string &token) const;
+
     Precedence get_precedence(const std::string &token) const;
+
     bool isLeftAssociative(const std::string &token) const;
-    bool isSeperator(char c)const;
+
+    bool isSeparator(char c) const;
 
     std::queue<std::string> ParseToRPN(const std::string &expression);
 
@@ -76,7 +80,7 @@ private:
 public:
     Dynamic_calc() {
         std::lock_guard<std::shared_mutex> lock(mutex_s);
-        ops_['+'] = {[](const std::vector<double> &args) -> OperationResult {
+        ops_["+"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 2) {
                 std::cerr << "UB for definition of essential algebraic operator!";
                 return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -85,7 +89,7 @@ public:
 
         }, Precedence::AddSub
         };
-        ops_['-'] = {[](const std::vector<double> &args) -> OperationResult {
+        ops_["-"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 2) {
                 std::cerr << "UB acc to definition of essential algebraic operator!";
                 return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -94,7 +98,7 @@ public:
 
         }, Precedence::AddSub
         };
-        ops_['*'] = {[](const std::vector<double> &args) -> OperationResult {
+        ops_["*"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 2) {
                 std::cerr << "UB acc to definition of essential algebraic operator!";
                 return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -103,7 +107,7 @@ public:
 
         }, Precedence::MultiDiv
         };
-        ops_['/'] = {[](const std::vector<double> &args) -> OperationResult {
+        ops_["/"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 2) {
                 std::cerr << "UB acc to definition of essential algebraic operator!";
                 return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -118,7 +122,7 @@ public:
             return OperationResult{std::optional<double>(args[0] / args[1]), CalcErr::None};
 
         }, Precedence::MultiDiv};
-        ops_['^'] = {[](const std::vector<double> &args) -> OperationResult {
+        ops_["^"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 2) {
                 std::cerr << "UB acc to definition of essential algebraic operator!";
                 return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -134,7 +138,7 @@ public:
             return OperationResult{std::optional<double>(std::pow(args[0], args[1])), CalcErr::None};
         }, Precedence::Pow
         };
-        ops_['%'] = {[](const std::vector<double> &args) -> OperationResult {
+        ops_["%"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 2) {
                 std::cerr << "UB acc to definition of essential algebraic operator!";
                 return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -147,9 +151,9 @@ public:
             }
 
             return OperationResult{std::optional<double>(std::fmod(args[0], args[1])), CalcErr::None};
-        },   Precedence::Mod
+        }, Precedence::Mod
         };
-        unary_ops_['s'] = {[](const std::vector<double> &args) -> OperationResult {
+        unary_ops_["sqrt"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 1) {
                 return {std::nullopt, CalcErr::ArgumentMismatch};
             }
@@ -158,7 +162,31 @@ public:
                 return {std::nullopt, CalcErr::NegativeRoot};
             }
             return {std::optional<double>(std::sqrt(x)), CalcErr::None};
-        }};
+        }, Precedence::Unary};
+        unary_ops_["sin"] = {[](const std::vector<double> &args) -> OperationResult {
+            if (args.size() != 1) {
+                return {std::nullopt, CalcErr::ArgumentMismatch};
+            }
+            return {std::optional<double>(std::sin(args[0])), CalcErr::None};
+        }, Precedence::Trigo};
+        unary_ops_["cos"] = {[](const std::vector<double> &args) -> OperationResult {
+            if (args.size() != 1) {
+                return {std::nullopt, CalcErr::ArgumentMismatch};
+            }
+            return {std::optional<double>(std::cos(args[0])), CalcErr::None};
+        }, Precedence::Trigo};
+        unary_ops_["tan"] = {[](const std::vector<double>&args)->OperationResult{
+            if(args.size()!=1){
+                return {std::nullopt , CalcErr::ArgumentMismatch};
+            }
+            return {std::optional<double>(std::tan(args[0])),CalcErr::None};
+            },Precedence::Trigo};
+        unary_ops_["cot"]= {[](const std::vector<double>&args)->OperationResult{
+            if (args.size()!=1){
+                return {std::nullopt , CalcErr::ArgumentMismatch};
+            }
+            return  {std::optional<double>((1/std::tan(args[0]))),CalcErr::None};
+            },Precedence::Trigo};
     }
 
     OperationResult Evaluate(const std::string &expression) {
@@ -166,6 +194,8 @@ public:
 
         return EvaluateRPN(rpn);
     };
+
+    void RegisterOperator(std::string op, const OperatorDetails &details);
 
     Dynamic_calc(const Dynamic_calc &other) = delete;
 
