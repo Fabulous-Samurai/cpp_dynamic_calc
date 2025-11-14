@@ -8,22 +8,23 @@ It evolved from a simple `switch`-statement alternative into a complete expressi
 
 This engine is built on modern C++ design principles:
 
-* **Dynamic Dispatch (Strategy Pattern):** Operators are stored in an `std::map` as `std::function` objects. This allows new operators to be added at runtime without modifying the core logic.
+* **Dynamic Dispatch (Strategy Pattern):** Operators are stored in an `std::map<std::string, ...>` using `std::function` objects. This allows new operators to be added at runtime without modifying the core logic.
 * **Expression Parsing (Shunting-Yard):** The engine correctly parses infix expressions (e.g., `3 + 5 * 2`) into Reverse Polish Notation (RPN) before evaluation, respecting mathematical operator precedence.
-* **Type-Safe Precedence:** Operator precedence is defined using a type-safe `enum class Precedence` instead of ambiguous "magic numbers" (like 1, 2, 3).
+* **Type-Safe Precedence:** Operator precedence is defined using a type-safe `enum class Precedence` instead of ambiguous "magic numbers".
 * **N-Arity Function Support:** All function signatures accept an `std::vector<double>` of arguments. This allows the engine to seamlessly handle:
-    * **Unary functions:** `s(9)` (sqrt)
-    * **Binary functions:** `3 + 5`
-    * **Future N-ary functions:** `sum(1, 2, 3)`
-* **Exception-Free Error Handling:** Failed operations (e.g., divide by zero, `0^0`, `0 % 0`) do not throw C++ exceptions. Instead, they return an `OperationResult` struct containing a `CalcErr` error code for robust, high-performance error handling.
+  * **Unary functions:** `sqrt 9`
+  * **Binary functions:** `3 + 5`
+  * **Future N-ary functions:** `sum(1, 2, 3)`
+* **Exception-Free Error Handling:** Failed operations (e.g., divide by zero, `0^0`, domain errors) do not throw C++ exceptions. Instead, they return an `OperationResult` struct containing a `CalcErr` enum code for robust, high-performance error handling.
 * **Thread-Safety (Read-Write Lock):** The operator maps (`ops_`, `unary_ops_`) are protected for concurrent access.
-    * **Reads (`Evaluate`):** Use `std::shared_lock` for maximum read performance (multiple threads can evaluate simultaneously).
-    * **Writes (Constructor):** Use `std::lock_guard` for exclusive write access during initialization.
+  * **Reads (`Evaluate`):** Use `std::shared_lock` for maximum read performance (multiple threads can evaluate simultaneously).
+  * **Writes (Constructor/Register):** Use `std::lock_guard` for exclusive write access during initialization and runtime registration.
+* **Runtime Extensibility:** The engine exposes a public `RegisterOperator` method, allowing new binary operators to be defined and added to the parser *after* compilation.
 
 ## 🛠️ Supported Operations
 
 * **Binary Operators:** `+`, `-`, `*`, `/`, `^` (power), `%` (modulus)
-* **Unary Operators:** `s` (square root)
+* **Unary Operators:** `sqrt`, `sin`, `cos`, `tan`, `cot`
 * **Grouping:** `( ... )`
 
 ## 🚀 How to Use
@@ -32,30 +33,44 @@ The engine is exposed via a single public method: `Evaluate(std::string expressi
 
 ### `main.cpp` Example
 
+The example below (based on your `dynamic_calc.cpp`) demonstrates how to register a new operator (`"m"` for max) at runtime and then evaluate an expression using it.
+
 ```cpp
 #include <iostream>
 #include <string>
 #include "dynamic_calc.h" // Include the calculator library
+#include <algorithm> // For std::max
 
 int main() {
-    std::string expression;
     Dynamic_calc calc_;
     
+    // 1. Register a new operator at runtime
+    std::cout << "Adding New Run-Time operator 'm' (max) \n";
+    Operation max_op = [](const std::vector<double> &args) -> OperationResult {
+        if (args.size() != 2) {
+            return {std::nullopt, CalcErr::ArgumentMismatch};
+        }
+        double max_result = std::max(args[0], args[1]);
+        return {std::optional<double>(max_result), CalcErr::None};
+    };
+    OperatorDetails max_details = {max_op, Precedence::AddSub};
+    calc_.RegisterOperator("m", max_details); //
+
+    // 2. Get expression from user
     std::cout << "C++ Dynamic Calc Engine (v1.0)\n";
     // Note: The current tokenizer is whitespace-sensitive.
-    std::cout << "Enter expression (e.g., 3 + 5 * ( s 9 - 1 ) )\n";
+    std::cout << "Enter expression (e.g., 3 + 5 * ( sqrt 9 - 1 ) or 10 m 50)\n";
     
-    // Use std::getline to read the full line with spaces
-    std::getline(std::cin, expression);
+    std::string expression;
+    std::getline(std::cin, expression); //
 
-    // Call the main evaluation function
-    auto evaluate_result = calc_.Evaluate(expression);
+    // 3. Call the main evaluation function
+    auto evaluate_result = calc_.Evaluate(expression); //
     
-    // 1. Check for success
+    // 4. Handle success or failure
     if (evaluate_result.err == CalcErr::None) {
         std::cout << "Result: " << evaluate_result.result.value() << "\n";
     } 
-    // 2. Handle errors
     else {
         std::cerr << "Error: ";
         switch (evaluate_result.err) {
@@ -74,6 +89,9 @@ int main() {
             case CalcErr::NegativeRoot:
                 std::cerr << "Cannot calculate square root of a negative number!\n";
                 break;
+            case CalcErr::DomainError:
+                std::cerr << "Input is outside the function's domain (e.g., asin(2))!\n";
+                break;
             default:
                 std::cerr << "An unknown critical error occurred!\n";
                 break;
@@ -81,3 +99,28 @@ int main() {
     }
     return 0;
 }
+
+🏗️ How to Build (CMake)
+
+This is a standard CMake project. It can be opened directly in CLion, VS Code (with the CMake Tools extension), or Visual Studio 2019+.
+
+CMakeLists.txt
+
+Ensure your CMakeLists.txt file requires the C++17 standard (or newer).
+CMake
+
+cmake_minimum_required(VERSION 3.20)
+project(DynamicCalc)
+
+# Force the C++17 standard (required for std::optional, std::map<string, ...>, etc.)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Tell CMake where to find the header files
+include_directories(.) 
+
+# Create the executable
+add_executable(DynamicCalc
+        # main.cpp (must be in its own file)
+        dynamic_calc.cpp
+        )
