@@ -9,7 +9,7 @@ OperationResult Dynamic_calc::EvaluateRPN(std::queue<std::string> &rpn_queue) {
     while (!rpn_queue.empty()) {
         std::string token = rpn_queue.front();
         rpn_queue.pop();
-        if (isdigit(token[0]) || token[0] == '-' && token.size() > 1 && isdigit(token[1])) {
+        if (isNumber(token)) {
             try {
                 value_stack.push(std::stod(token));
             } catch (std::exception &e) {
@@ -30,30 +30,30 @@ OperationResult Dynamic_calc::EvaluateRPN(std::queue<std::string> &rpn_queue) {
                 return op_res;
             }
             value_stack.push(op_res.result.value());
-        } else if (unary_ops.count(token[0])) {
-            if (value_stack.size() < 1) {
+        } else if (unary_ops_.count(token[0])) {
+            if (value_stack.size() != 1) {
                 return {std::nullopt, CalcErr::ArgumentMismatch};
             }
             double val = value_stack.top();
             value_stack.pop();
             std::vector<double> args = {val};
-            OperationResult unary_op_res = unary_ops.at(token[0]).unary_operation(args);
+            OperationResult unary_op_res = unary_ops_.at(token[0]).operation(args);
             if (unary_op_res.err != CalcErr::None) {
                 return unary_op_res;
             }
-            value_stack.push(std::stod(token));
-        }
-        if (value_stack.size() != 1) {
-            return {std::nullopt, CalcErr::ArgumentMismatch};
+            value_stack.push(unary_op_res.result.value());
         }
 
+
+    }
+    if (value_stack.size() != 1) {
+        return {std::nullopt, CalcErr::ArgumentMismatch};
     }
     return {std::optional<double>(value_stack.top()), CalcErr::None};
 };
 
 bool Dynamic_calc::isNumber(const std::string &token) const {
     if (token.empty()) return false;
-
     char *end = nullptr;
     std::strtod(token.c_str(), &end);
     return (end == (token.c_str() + token.size()));
@@ -65,8 +65,8 @@ Precedence Dynamic_calc::get_precedence(const std::string &token) const {
     if (ops_.count(op)) {
         return ops_.at(op).precedence;
     }
-    if (unary_ops.count(op)) {
-        return unary_ops.at(op).precedence;
+    if (unary_ops_.count(op)) {
+        return unary_ops_.at(op).precedence;
     }
     return Precedence::None;
 };
@@ -89,7 +89,7 @@ std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) 
 
         if (isNumber(token)) {
             output_queue.push(token);
-        } else if (token.length() == 1 && unary_ops.count(token[0])) {
+        } else if (token.length() == 1 && unary_ops_.count(token[0])) {
             operator_stack.push(token);
         } else if (token.length() == 1 && ops_.count(token[0])) {
             Precedence current_precedence = ops_.at(token[0]).precedence;
@@ -138,10 +138,10 @@ int main() {
     std::cout << "Obtain an Expression\n";
     std::getline(std::cin, expression);
     auto evaluate_result = calc_.Evaluate(expression);
-    if(evaluate_result.err == CalcErr::None){
-        std::cout<<"Result :"<<evaluate_result.result.value()<<"\n";
+    if (evaluate_result.err == CalcErr::None) {
+        std::cout << "Result :" << evaluate_result.result.value() << "\n";
     }
-    std::cerr << "Hata:";
+    std::cerr << "Error:";
     switch (evaluate_result.err) {
         case CalcErr::DivideByZero :
             std::cerr << "Can't Dividable by 0!";
@@ -151,6 +151,9 @@ int main() {
             break;
         case CalcErr::OperationNotFound :
             std::cerr << "Can't find the Obtained Operation";
+            break;
+        case CalcErr::NegativeRoot:
+            std::cerr << "Can not take sqrt of a negative number";
         default:
             std::cerr << "Unknown Error Occurred!";
             break;
