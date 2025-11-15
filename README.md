@@ -19,21 +19,41 @@ This engine is built on modern C++ design principles:
 * **Thread-Safety (Read-Write Lock):** The operator maps (`ops_`, `unary_ops_`) are protected for concurrent access.
   * **Reads (`Evaluate`):** Use `std::shared_lock` for maximum read performance (multiple threads can evaluate simultaneously).
   * **Writes (Constructor/Register):** Use `std::lock_guard` for exclusive write access during initialization and runtime registration.
-* **Runtime Extensibility:** The engine exposes a public `RegisterOperator` method, allowing new binary operators to be defined and added to the parser *after* compilation.
+* **Runtime Extensibility:** The engine exposes public `RegisterOperator` and `RegisterUnaryOperator` methods, allowing new functions to be defined and added to the parser *after* compilation.
 
 ## 🛠️ Supported Operations
 
-* **Binary Operators:** `+`, `-`, `*`, `/`, `^` (power), `%` (modulus)
-* **Unary Operators:** `sqrt`, `sin`, `cos`, `tan`, `cot`
+The engine supports a wide range of scientific and algebraic operations.
+
+### Binary Operators (2 Arguments)
+
+* **Arithmetic:** `+` (Add), `-` (Subtract), `*` (Multiply), `/` (Divide)
+* **Power:** `^` (Exponentiation)
+* **Modulus:** `%` (Modulus)
+
+### Unary Operators (1 Argument)
+
 * **Grouping:** `( ... )`
+* **Basic:** `sqrt` (Square Root), `exp` (e^x)
+* **Logarithmic:** `ln` (Natural log), `log` (Base 10 log), `lg` (Base 2 log)
+* **Trigonometric (Input in Degrees):**
+  * `sin`, `cos`, `tan`
+  * `cot`, `sec`, `csc`
+* **Inverse Trig (Output in Degrees):**
+  * `arcsin`, `arccos`, `arctan`
+  * `arccot`
+* **Hyperbolic (Input is unitless):**
+  * `sinh`, `cosh`, `tanh`
+  * `coth`, `sech`, `csch`
+* **Inverse Hyperbolic (Output is unitless):**
+  * `arcsinh`, `arccosh`, `arctanh`
+  * `arccoth`, `arcsech`, `arccsch`
 
 ## 🚀 How to Use
 
 The engine is exposed via a single public method: `Evaluate(std::string expression)`.
 
 ### `main.cpp` Example
-
-The example below (based on your `dynamic_calc.cpp`) demonstrates how to register a new operator (`"m"` for max) at runtime and then evaluate an expression using it.
 
 ```cpp
 #include <iostream>
@@ -44,8 +64,8 @@ The example below (based on your `dynamic_calc.cpp`) demonstrates how to registe
 int main() {
     Dynamic_calc calc_;
     
-    // 1. Register a new operator at runtime
-    std::cout << "Adding New Run-Time operator 'm' (max) \n";
+    // 1. Register a new operator at runtime (Example)
+    std::cout << "Adding New Run-Time operator 'max' (example)\n";
     Operation max_op = [](const std::vector<double> &args) -> OperationResult {
         if (args.size() != 2) {
             return {std::nullopt, CalcErr::ArgumentMismatch};
@@ -54,18 +74,19 @@ int main() {
         return {std::optional<double>(max_result), CalcErr::None};
     };
     OperatorDetails max_details = {max_op, Precedence::AddSub};
-    calc_.RegisterOperator("m", max_details); //
+    calc_.RegisterOperator("max", max_details);
 
     // 2. Get expression from user
     std::cout << "C++ Dynamic Calc Engine (v1.0)\n";
     // Note: The current tokenizer is whitespace-sensitive.
-    std::cout << "Enter expression (e.g., 3 + 5 * ( sqrt 9 - 1 ) or 10 m 50)\n";
+    std::cout << "Enter expression (e.g., 3 + 5 * ( sin 90 - 1 ) or 10 max 50)\n";
+    std::cout << ">> ";
     
     std::string expression;
-    std::getline(std::cin, expression); //
+    std::getline(std::cin, expression);
 
     // 3. Call the main evaluation function
-    auto evaluate_result = calc_.Evaluate(expression); //
+    auto evaluate_result = calc_.Evaluate(expression);
     
     // 4. Handle success or failure
     if (evaluate_result.err == CalcErr::None) {
@@ -77,7 +98,7 @@ int main() {
             case CalcErr::DivideByZero:
                 std::cerr << "Division by Zero!\n";
                 break;
-            case CalcErr::IndeterminateResult:
+            case CalcName::IndeterminateResult:
                 std::cerr << "Indeterminate Result (0/0, 0^0, etc.)!\n";
                 break;
             case CalcErr::OperationNotFound:
@@ -90,7 +111,7 @@ int main() {
                 std::cerr << "Cannot calculate square root of a negative number!\n";
                 break;
             case CalcErr::DomainError:
-                std::cerr << "Input is outside the function's domain (e.g., asin(2))!\n";
+                std::cerr << "Input is outside the function's domain (e.g., arcsin 2)!\n";
                 break;
             default:
                 std::cerr << "An unknown critical error occurred!\n";
@@ -121,6 +142,6 @@ include_directories(.)
 
 # Create the executable
 add_executable(DynamicCalc
-        # main.cpp (must be in its own file)
+        main.cpp
         dynamic_calc.cpp
         )
