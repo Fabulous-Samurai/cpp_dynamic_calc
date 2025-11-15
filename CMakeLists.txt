@@ -5,4 +5,5 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(cpp_dynamic_calc
         dynamic_calc.cpp
-        dynamic_calc.h)
+        dynamic_calc.h
+        main.cpp)
