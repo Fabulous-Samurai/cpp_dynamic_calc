@@ -41,7 +41,7 @@ The engine supports a wide range of scientific and algebraic operations.
   * `cot`, `sec`, `csc`
 * **Inverse Trig (Output in Degrees):**
   * `arcsin`, `arccos`, `arctan`
-  * `arccot`
+  * `arccot`, `arcsec`, `arccsc`
 * **Hyperbolic (Input is unitless):**
   * `sinh`, `cosh`, `tanh`
   * `coth`, `sech`, `csch`
