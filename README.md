@@ -15,7 +15,7 @@ This engine is built on modern C++ design principles:
   * **Unary functions:** `sqrt 9`
   * **Binary functions:** `3 + 5`
   * **Future N-ary functions:** `sum(1, 2, 3)`
-* **Exception-Free Error Handling:** Failed operations (e.g., divide by zero, `0^0`, domain errors) do not throw C++ exceptions. Instead, they return an `OperationResult` struct containing a `CalcErr` enum code for robust, high-performance error handling.
+* **Exception-Free Error Handling:** Failed operations (e.g., divide by zero, `0^0`, domain errors) do not throw C++ exceptions. Instead, they return an `EngineResult` struct containing a `CalcErr` enum code for robust, high-performance error handling.
 * **Thread-Safety (Read-Write Lock):** The operator maps (`ops_`, `unary_ops_`) are protected for concurrent access.
   * **Reads (`Evaluate`):** Use `std::shared_lock` for maximum read performance (multiple threads can evaluate simultaneously).
   * **Writes (Constructor/Register):** Use `std::lock_guard` for exclusive write access during initialization and runtime registration.
@@ -66,7 +66,7 @@ int main() {
     
     // 1. Register a new operator at runtime (Example)
     std::cout << "Adding New Run-Time operator 'max' (example)\n";
-    Operation max_op = [](const std::vector<double> &args) -> OperationResult {
+    Operation max_op = [](const std::vector<double> &args) -> EngineResult {
         if (args.size() != 2) {
             return {std::nullopt, CalcErr::ArgumentMismatch};
         }

@@ -2,45 +2,74 @@
 #include <string>
 #include "dynamic_calc.h"
 
+void PrintResult(const EngineResult& result) {
+    if (result.error.has_value()) {
+        std::cerr << "Error: ";
+        std::visit([](auto&& err) {
+            using T = std::decay_t<decltype(err)>;
+            if constexpr (std::is_same_v<T, CalcErr>) {
+                switch (err) {
+                    case CalcErr::DivideByZero: std::cerr << "Division by 0 Error!\n"; break;
+                    case CalcErr::IndeterminateResult: std::cerr << "Indeterminate Result (0/0, vb.)!\n"; break;
+                    case CalcErr::OperationNotFound: std::cerr << "Operator Can't Find!\n"; break;
+                    case CalcErr::ArgumentMismatch: std::cerr << "Expression Error (Incomplete Number or Operator)!\n"; break;
+                    case CalcErr::NegativeRoot: std::cerr << "Negative Root Error!\n"; break;
+                    case CalcErr::DomainError: std::cerr << "Domain Error (e.g.: arcsin(2))!\n"; break;
+                    default: std::cerr << "Unknown Algebraic Error!\n"; break;
+                }
+            } else if constexpr (std::is_same_v<T, LinAlgErr>) {
+                switch (err) {
+                    case LinAlgErr::NoSolution: std::cerr << "No Solution!\n"; break;
+                    case LinAlgErr::InfiniteSolutions: std::cerr << "Infinite Solutions!\n"; break;
+                    case LinAlgErr::ParseError: std::cerr << "Equation can't be Separated!\n"; break;
+                    default: std::cerr << "Unknown Linear Algebraic Error!\n"; break;
+                }
+            }
+        }, result.error.value());
+
+    } else if (result.result.has_value()) {
+        std::cout << "Result: ";
+        std::visit([](auto&& res) {
+            using T = std::decay_t<decltype(res)>;
+            if constexpr (std::is_same_v<T, double>) {
+                std::cout << res << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                std::cout << "[ ";
+                for (double d : res) {
+                    std::cout << d << " ";
+                }
+                std::cout << "]\n";
+            }
+        }, result.result.value());
+    }
+}
+
 int main() {
     std::string expression;
-    Dynamic_calc calc_;
+    CalcEngine calc_;
 
-    std::cout << "C++ Dynamic Calc Engine (v1.0)\n";
-    std::cout << "Enter expression (e.g., 3 + 5 * ( sin 90 - 1 ) )\n";
-    std::cout << ">> ";
+    std::cout << "C++ Calc Engine (v2.0 - Refactored)\n";
+    std::cout << "Commands: mode algebraic | mode linear | exit\n";
 
-    std::getline(std::cin, expression);
+    while (true) {
+        std::cout << ">> ";
+        std::getline(std::cin, expression);
 
-    auto evaluate_result = calc_.Evaluate(expression);
-
-    if (evaluate_result.err == CalcErr::None) {
-        std::cout << "Result: " << evaluate_result.result.value() << "\n";
-    } else {
-        std::cerr << "Error: ";
-        switch (evaluate_result.err) {
-            case CalcErr::DivideByZero:
-                std::cerr << "Division by Zero!\n";
-                break;
-            case CalcErr::IndeterminateResult:
-                std::cerr << "Indeterminate Result (0/0, 0^0, etc.)!\n";
-                break;
-            case CalcErr::OperationNotFound:
-                std::cerr << "Operation not found or invalid expression!\n";
-                break;
-            case CalcErr::ArgumentMismatch:
-                std::cerr << "Expression Error (Missing number or operator)!\n";
-                break;
-            case CalcErr::NegativeRoot:
-                std::cerr << "Cannot calculate square root of a negative number!\n";
-                break;
-            case CalcErr::DomainError:
-                std::cerr << "Input is outside the function's domain (e.g., asin(2))!\n";
-                break;
-            default:
-                std::cerr << "An unknown critical error occurred!\n";
-                break;
+        if (expression == "exit") {
+            break;
+        } else if (expression == "mode algebraic") {
+            calc_.SetMode(CalcMode::Algebraic);
+            std::cout << "Mode switched to Algebraic.\n";
+            continue;
+        } else if (expression == "mode linear") {
+            calc_.SetMode(CalcMode::LinearSystem);
+            std::cout << "Mode switched to Linear System.\n";
+            continue;
         }
+
+        auto result = calc_.Evaluate(expression);
+        PrintResult(result);
     }
+
     return 0;
 }
