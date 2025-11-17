@@ -186,13 +186,14 @@ public:
         unary_ops_["arcsec"]={[](const std::vector<double>&args)->OperationResult{
                 if(args.size()!=1) return {std::nullopt,CalcErr::ArgumentMismatch};
                 double x = args[0];
-                if(std::abs(x)>1.0) return {std::nullopt,CalcErr::DomainError};
-                return {std::optional<double>((1.0/std::acos(args[0]))*R2D),CalcErr::None};
+                if(std::abs(x)<1.0) return {std::nullopt,CalcErr::DomainError};
+                return {std::optional<double>(std::acos(1.0/args[0])*R2D),CalcErr::None};
                 },Precedence::Unary};
         unary_ops_["arccsc"] = {[](const std::vector<double>&args)->OperationResult{
                 if(args.size()!=1) return {std::nullopt , CalcErr::ArgumentMismatch};
                 double x  = args[0];
-                return {std::optional<double>(std::asinh(1.0/args[0])*R2D),CalcErr::None};
+                if(std::abs(x)<1.0) return {std::nullopt,CalcErr::DomainError};
+                return {std::optional<double>(std::asin(1.0/args[0])*R2D),CalcErr::None};
                 },Precedence::Unary};
         unary_ops_["log"] = {[](const std::vector<double> &args) -> OperationResult {
             if (args.size() != 1) return {std::nullopt, CalcErr::ArgumentMismatch};

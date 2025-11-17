@@ -12,6 +12,7 @@ bool Dynamic_calc::isNumber(const std::string &token) const {
 }
 
 Precedence Dynamic_calc::get_precedence(const std::string &token) const {
+    // Note: This function assumes the caller already holds a lock
     if (ops_.count(token)) {
         return ops_.at(token).precedence;
     }
@@ -22,6 +23,7 @@ Precedence Dynamic_calc::get_precedence(const std::string &token) const {
 }
 
 bool Dynamic_calc::isSeparator(char c) const {
+    // Note: This function assumes the caller already holds a lock
     std::string s(1, c);
     return (c == '(' || c == ')') || ops_.count(s);
 }
@@ -34,6 +36,7 @@ bool Dynamic_calc::isLeftAssociative(const std::string &token) const {
 }
 
 std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) {
+    std::shared_lock<std::shared_mutex> lock(mutex_s);
     std::queue<std::string> output_queue;
     std::stack<std::string> operator_stack;
 
@@ -42,12 +45,15 @@ std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) 
         char c = expression[i];
         if (isspace(c)) {
             prepared_expression += ' ';
-        } else if (isSeparator(c)) {
-            prepared_expression += ' ';
-            prepared_expression += c;
-            prepared_expression += ' ';
         } else {
-            prepared_expression += c;
+            std::string s(1, c);
+            if (c == '(' || c == ')' || ops_.count(s)) {
+                prepared_expression += ' ';
+                prepared_expression += c;
+                prepared_expression += ' ';
+            } else {
+                prepared_expression += c;
+            }
         }
     }
 
@@ -91,6 +97,7 @@ std::queue<std::string> Dynamic_calc::ParseToRPN(const std::string &expression) 
 }
 
 OperationResult Dynamic_calc::EvaluateRPN(std::queue<std::string> &rpn_queue) {
+    std::shared_lock<std::shared_mutex> lock(mutex_s);
     std::stack<double> value_stack;
     while (!rpn_queue.empty()) {
         std::string token = rpn_queue.front();
@@ -129,6 +136,9 @@ OperationResult Dynamic_calc::EvaluateRPN(std::queue<std::string> &rpn_queue) {
                 return unary_op_res;
             }
             value_stack.push(unary_op_res.result.value());
+        } else {
+            // Unknown token - not a number, not an operator, not a unary operator
+            return {std::nullopt, CalcErr::OperationNotFound};
         }
     }
 

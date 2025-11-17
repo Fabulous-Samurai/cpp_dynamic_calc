@@ -1,3 +1,0 @@
-/home/runner/work/cpp_dynamic_calc/cpp_dynamic_calc/build/CMakeFiles/cpp_dynamic_calc.dir
-/home/runner/work/cpp_dynamic_calc/cpp_dynamic_calc/build/CMakeFiles/edit_cache.dir
-/home/runner/work/cpp_dynamic_calc/cpp_dynamic_calc/build/CMakeFiles/rebuild_cache.dir
