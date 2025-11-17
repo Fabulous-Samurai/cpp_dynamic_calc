@@ -7,3 +7,8 @@ add_executable(cpp_dynamic_calc
         dynamic_calc.cpp
         dynamic_calc.h
         main.cpp)
+
+add_executable(test_calc
+        dynamic_calc.cpp
+        dynamic_calc.h
+        test_calc.cpp)
