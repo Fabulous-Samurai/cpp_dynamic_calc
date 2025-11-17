@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/cpp_dynamic_calc.dir/link.d CMakeFiles/cpp_dynamic_calc.dir/dynamic_calc.cpp.o CMakeFiles/cpp_dynamic_calc.dir/main.cpp.o -o cpp_dynamic_calc
