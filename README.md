@@ -1,3 +1,9 @@
+C++ Dynamic Thread-Safe Calculation Engine
+
+    Not just a calculator; an architectural journey from procedural roots to a modern, multi-paradigm calculation engine.
+
+This project isn't just about doing math—it's a testament to Modern C++ (C++20) architecture. It documents the transformation of a rigid, procedural codebase into a flexible, thread-safe system, leveraging advanced patterns like Strategy, Dependency Injection, and Data-Oriented Design.
+
 🚀 The Architectural Evolution
 
 This engine wasn't built in a day; it was forged through four distinct evolutionary phases, each tackling a specific software engineering nightmare:
@@ -65,3 +71,4 @@ Phase IV: The Scientific Quantum Leap
 💻 Code in Action
 
 C++
+
