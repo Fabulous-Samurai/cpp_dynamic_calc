@@ -3,6 +3,7 @@
 #include "IParser.h"
 #include "dynamic_calc_types.h"
 #include <map>
+#include <sstream>
 #include <mutex>
 #include <queue>
 #include <stack>
@@ -29,3 +30,4 @@ private:
     std::queue<std::string> ParseToRPN(const std::string &expression);
     EngineResult EvaluateRPN(std::queue<std::string> &rpn_queue);
 };
+

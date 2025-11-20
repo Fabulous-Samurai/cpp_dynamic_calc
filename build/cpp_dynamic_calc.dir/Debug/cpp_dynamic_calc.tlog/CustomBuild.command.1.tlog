@@ -1,0 +1,10 @@
+^C:\CPP_DYNAMIC_CALC\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/cpp_dynamic_calc -BC:/cpp_dynamic_calc/build --check-stamp-file C:/cpp_dynamic_calc/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

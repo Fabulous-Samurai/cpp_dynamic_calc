@@ -3,7 +3,9 @@
 #include "dynamic_calc.h"
 
 void PrintResult(const EngineResult& result) {
-    if (result.error.has_value()) {
+    if (result.error.has_value() && result.result.has_value()) {
+        std::cerr << "Error: Both error and result are set, which is invalid.\n";
+    } else if (result.error.has_value()) {
         std::cerr << "Error: ";
         std::visit([](auto&& err) {
             using T = std::decay_t<decltype(err)>;
@@ -37,6 +39,16 @@ void PrintResult(const EngineResult& result) {
                 std::cout << "[ ";
                 for (double d : res) {
                     std::cout << d << " ";
+                }
+                std::cout << "]\n";
+            } else if constexpr (std::is_same_v<T, Matrix>) {
+                std::cout << "[\n";
+                for (const auto& row : res) {
+                    std::cout << "  [ ";
+                    for (double val : row) {
+                        std::cout << val << " ";
+                    }
+                    std::cout << "]\n";
                 }
                 std::cout << "]\n";
             }

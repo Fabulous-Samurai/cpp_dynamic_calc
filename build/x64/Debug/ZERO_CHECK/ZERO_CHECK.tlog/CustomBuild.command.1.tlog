@@ -1,0 +1,10 @@
+^C:\CPP_DYNAMIC_CALC\BUILD\CMAKEFILES\F182D5102664A4E9DC28C978D6E1210A\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/cpp_dynamic_calc -BC:/cpp_dynamic_calc/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/cpp_dynamic_calc/build/cpp_dynamic_calc.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
