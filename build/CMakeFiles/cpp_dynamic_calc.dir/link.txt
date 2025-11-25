@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\cpp_dynamic_calc.dir/objects.a
+C:\msys64\ucrt64\bin\ar.exe qc CMakeFiles\cpp_dynamic_calc.dir/objects.a @CMakeFiles\cpp_dynamic_calc.dir\objects1.rsp
+C:\msys64\ucrt64\bin\g++.exe -g -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lwinpthread -Wl,-Bdynamic -Wl,--whole-archive CMakeFiles\cpp_dynamic_calc.dir/objects.a -Wl,--no-whole-archive -o cpp_dynamic_calc.exe -Wl,--out-implib,libcpp_dynamic_calc.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\cpp_dynamic_calc.dir\linkLibs.rsp

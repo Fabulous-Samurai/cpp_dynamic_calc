@@ -1,0 +1,2 @@
+C:\msys64\ucrt64\bin\ar.exe qc libftxui-screen.a CMakeFiles/screen.dir/src/ftxui/screen/box.cpp.obj CMakeFiles/screen.dir/src/ftxui/screen/color.cpp.obj CMakeFiles/screen.dir/src/ftxui/screen/color_info.cpp.obj CMakeFiles/screen.dir/src/ftxui/screen/image.cpp.obj CMakeFiles/screen.dir/src/ftxui/screen/screen.cpp.obj CMakeFiles/screen.dir/src/ftxui/screen/string.cpp.obj CMakeFiles/screen.dir/src/ftxui/screen/terminal.cpp.obj
+C:\msys64\ucrt64\bin\ranlib.exe libftxui-screen.a

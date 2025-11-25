@@ -31,6 +31,9 @@ C:/Program Files/CMake/share/cmake-4.0/Modules/CMakeTestCCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/CMakeTestCXXCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/CMakeTestCompilerCommon.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/CMakeTestRCCompiler.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckCSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckIncludeFile.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckLibraryExists.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Compiler/ADSP-DetermineCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Compiler/ARMCC-DetermineCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Compiler/ARMClang-DetermineCompiler.cmake
@@ -89,10 +92,14 @@ C:/Program Files/CMake/share/cmake-4.0/Modules/Compiler/XLClang-CXX-DetermineCom
 C:/Program Files/CMake/share/cmake-4.0/Modules/Compiler/zOS-C-DetermineCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/CompilerId/VS-10.vcxproj.in
+C:/Program Files/CMake/share/cmake-4.0/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/FindPackageMessage.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/FindThreads.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCXXLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CMakeCommonLinkerInformation.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CMakeDetermineLinkerId.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CheckSourceCompiles.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/FeatureTesting.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Linker/MSVC-C.cmake
 C:/Program Files/CMake/share/cmake-4.0/Modules/Linker/MSVC-CXX.cmake

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\cpp_dynamic_calc\build\CMakeFiles\f182d5102664a4e9dc28c978d6e1210a\PACKAGE_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{9C6F4FD3-461A-3D01-BFE8-5CF5030E59C6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
