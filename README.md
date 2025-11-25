@@ -1,60 +1,61 @@
-
-
------
-
 # C++ Dynamic Thread-Safe Calculation Engine
 
-> **From a simple `switch` statement to a multi-paradigm mathematical engine.**
+> **Not just a calculator; an architectural journey from procedural roots to a modern, multi-paradigm calculation engine.**
 
-This project represents a deep dive into modern C++ architecture, evolving from a basic calculator concept into a robust, thread-safe, and dynamically extensible analysis engine. It demonstrates the transition from procedural code to advanced design patterns like **Strategy**, **Dependency Injection**, and **Data-Oriented Design**.
+![C++ Standard](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-## 🚀 Evolution & Architecture
+This project isn't just about doing math—it's a testament to **Modern C++ (C++20)** architecture. It documents the transformation of a rigid, procedural codebase into a flexible, thread-safe system, leveraging advanced patterns like **Strategy**, **Dependency Injection**, and **Data-Oriented Design**.
 
-The engine was built in distinct evolutionary stages, each solving a critical architectural challenge:
+---
 
-### Phase I: The Dynamic Core (OCP)
+## 🚀 The Architectural Evolution
 
-  * **Challenge:** Traditional calculators use rigid `switch` statements that require recompilation to add new features.
-  * **Solution:** Implemented the **Open/Closed Principle** using a **Dynamic Dispatch** system. Operators are stored in `std::map` structures as `std::function` objects, allowing new operations (binary or unary) to be registered at **runtime** without modifying the source code.
+This engine wasn't built in a day; it was forged through four distinct evolutionary phases, each tackling a specific software engineering nightmare:
 
-### Phase II: Expression Intelligence (Shunting-Yard)
+### Phase I: Breaking the Monolith (OCP & Dynamic Dispatch)
+* **The Obstacle:** The classic "Switch-Case Hell." Adding a new operator meant modifying the core loop, violating the Open/Closed Principle and inviting spaghetti code.
+* **The Breakthrough:** We moved to a **Dynamic Dispatch** system. Operators are no longer hardcoded logic but are treated as first-class citizens stored in `std::map<string, std::function>`.
+* **Result:** You can now register new binary or unary operations at **runtime** without recompiling a single line of the core engine.
 
-  * **Challenge:** Simple command execution cannot handle operator precedence (e.g., `3 + 5 * 2`).
-  * **Solution:** Integrated a custom implementation of Dijkstra's **Shunting-Yard Algorithm**. The engine now tokenizes strings, respects mathematical precedence (PEMDAS), handles parentheses, and computes results using a **Reverse Polish Notation (RPN)** stack machine.
+### Phase II: Teaching Logic to the Machine (Shunting-Yard)
+* **The Obstacle:** A simple calculator fails when faced with complexity like `3 + 5 * 2`. It lacks the context of "order of operations."
+* **The Breakthrough:** We integrated a custom **Shunting-Yard Algorithm**. The engine doesn't just calculate; it *parses*. It tokenizes input, respects mathematical precedence (PEMDAS), manages parentheses, and executes logic using a **Reverse Polish Notation (RPN)** stack machine.
 
-### Phase III: Professional Stability (SOLID & Thread-Safety)
+### Phase III: Taming Concurrency (Thread-Safety & SOLID)
+* **The Obstacle:** As capabilities grew, the engine became a fragile monolith—unsafe for concurrent requests and hard to test.
+* **The Breakthrough:**
+    * **Bulletproof Concurrency:** Adopted a **Readers-Writer Lock** model using `std::shared_mutex`. Multiple threads can calculate simultaneously, while registration remains exclusive.
+    * **Deterministic Errors:** Goodbye, `try-catch`. We replaced costly exceptions with `std::variant` and `std::optional` for zero-overhead, type-safe error handling.
+    * **Strategy Pattern:** The code was decoupled into specialized strategies (`AlgebraicParser` vs. `LinearSystemParser`) orchestrated by a central Context (`CalcEngine`).
 
-  * **Challenge:** As features grew, the codebase became monolithic and unsafe for concurrent use.
-  * **Solution:**
-      * **Thread Safety:** Implemented `std::shared_mutex` for a **Readers-Writer Lock** model, allowing multiple threads to evaluate expressions simultaneously while ensuring exclusive access during operator registration.
-      * **Exception-Free Design:** Replaced costly C++ exceptions with a `std::variant`-based `EngineResult` type, providing deterministic and high-performance error handling.
-      * **SOLID Refactoring:** The monolithic class was refactored into specialized **Parser Strategies** (`AlgebraicParser`, `LinearSystemParser`) managed by a central `CalcEngine` (Context), adhering to the **Single Responsibility Principle**.
+### Phase IV: The Scientific Quantum Leap
+* **The Obstacle:** Basic arithmetic wasn't enough. We needed a tool for scientific analysis and system solving.
+* **The Breakthrough:**
+    * **Advanced Math:** Full support for Trigonometric, Inverse Trigonometric, Hyperbolic, and Logarithmic functions.
+    * **Linear Algebra:** A powerful **Gauss-Jordan Elimination** solver that parses natural language equations (e.g., `2x + y = 5`) and solves for $N$ variables instantly.
 
-### Phase IV: Scientific & Linear Algebra Expansion
+---
 
-  * **Challenge:** A calculator is limited without advanced math and system solving capabilities.
-  * **Solution:**
-      * **Advanced Math:** Added support for **Trigonometric** (sin, cos, tan), **Inverse Trigonometric** (arcsin, arccos), **Hyperbolic** (sinh, cosh), and **Logarithmic** (log, ln, lg) functions.
-      * **Linear Systems:** Integrated a **Gauss-Jordan Elimination** solver capable of parsing and solving $N \times N$ linear equation systems (e.g., `2x + y = 5`).
+## 🛠️ Capabilities under the Hood
 
------
+### 🧮 Algebraic Engine
+* **Core:** `+`, `-`, `*`, `/`, `^`, `%`
+* **Functions:** `sqrt`, `abs`, `exp`
+* **Trigonometry:** `sin`, `cos`, `tan`, `cot`, `sec`, `csc` (Degrees)
+* **Transcendental:** `log` (base 10), `ln` (base e), `lg` (base 2), plus inverse trig functions.
 
-## 🛠️ Features
+### 📐 Linear Algebra Engine
+* **Natural Parsing:** Understands equations as strings: `"2x + 3y = 10; x - y = 5"`
+* **Solver:** Optimized matrix algorithms for N-variable systems.
 
-  * **Algebraic Engine:**
-      * Binary Operators: `+`, `-`, `*`, `/`, `^`, `%`
-      * Unary Functions: `sqrt`, `abs`, `exp`
-      * Trigonometry: `sin`, `cos`, `tan`, `cot`, `sec`, `csc` (Degrees)
-      * Inverse Trig: `arcsin`, `arccos`, `arctan`, etc.
-      * Logarithms: `log` (base 10), `ln` (base e), `lg` (base 2)
-  * **Linear Algebra Engine:**
-      * Parses string equations (e.g., `"2x + 3y = 10; x - y = 5"`)
-      * Solves for $N$ variables using optimized matrix algorithms.
-  * **System Features:**
-      * **Zero-Overhead Error Handling:** Uses `std::optional` and `std::variant`.
-      * **Hot-Swappable Modes:** Switch between `Algebraic` and `LinearSystem` modes at runtime.
+### ⚙️ System Architecture
+* **Zero-Overhead:** Heavy reliance on C++17/20 features (`std::variant`, `std::optional`) to avoid exception overhead.
+* **Hot-Swapping:** Switch parsing strategies (Algebraic <-> Linear) on the fly without restarting the engine.
 
-## 💻 Usage Example
+---
+
+## 💻 Code in Action
 
 ```cpp
 #include <iostream>
@@ -63,30 +64,31 @@ The engine was built in distinct evolutionary stages, each solving a critical ar
 int main() {
     CalcEngine engine;
 
-    // 1. Algebraic Mode (Default)
+    // 1. Algebraic Mode: Handling complexity and precedence
     auto result = engine.Evaluate("3 + 5 * ( sin 90 - 1 )");
     // Output: Result: 3
 
-    // 2. Linear System Mode
+    // 2. Linear System Mode: Solving equations
     engine.SetMode(CalcMode::LinearSystem);
     auto sys_result = engine.Evaluate("2x + y = 5; x - y = 1");
     // Output: Result: [ 2, 1 ]  (where x=2, y=1)
     
     return 0;
 }
-```
 
-## 🏗️ Build
+🏗️ Build & Run
 
-This project uses **CMake** for cross-platform compatibility.
+This project uses CMake for cross-platform compatibility.
+Bash
 
-```bash
+# 1. Create build directory
 mkdir build && cd build
+
+# 2. Configure and build
 cmake ..
 make
+
+# 3. Run
 ./DynamicCalc
-```
 
------
-
-*This project is a testament to clean code, architectural discipline, and the power of Modern C++.*
+Built with precision, designed for scalability. A showcase of Modern C++ discipline.
