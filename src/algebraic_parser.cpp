@@ -446,6 +446,263 @@ struct UnaryOpNode : ExprNode {
 };
 
 // ========================================================
+// MULTI-ARGUMENT FUNCTION NODE (FOR CALCULUS OPERATIONS)
+// ========================================================
+struct MultiArgFunctionNode : ExprNode {
+    std::string_view func;
+    std::vector<NodePtr> args;
+    
+    MultiArgFunctionNode(std::string_view f, std::vector<NodePtr> arguments) 
+        : func(f), args(std::move(arguments)) {}
+    
+    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+        if (func == "limit") {
+            if (args.size() != 3) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            // limit(expression, variable, point)
+            // Use epsilon-delta numerical limit calculation
+            auto var_node = dynamic_cast<VariableNode*>(args[1]);
+            if (!var_node) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            std::string var_name = std::string(var_node->name);
+            auto point_result = args[2]->Evaluate(vars);
+            if (!point_result.HasValue()) return point_result;
+            double approach_point = *point_result.value;
+            
+            // Check for infinite limit
+            if (std::isinf(approach_point)) {
+                return EvaluateLimitAtInfinity(vars, var_name, approach_point > 0);
+            }
+            
+            return EvaluateNumericalLimit(vars, var_name, approach_point);
+        }
+        
+        if (func == "integrate") {
+            if (args.size() != 4) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            // integrate(expression, variable, lower_bound, upper_bound)
+            auto var_node = dynamic_cast<VariableNode*>(args[1]);
+            if (!var_node) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            std::string var_name = std::string(var_node->name);
+            auto lower_result = args[2]->Evaluate(vars);
+            auto upper_result = args[3]->Evaluate(vars);
+            
+            if (!lower_result.HasValue() || !upper_result.HasValue()) {
+                return EvalResult::Failure(CalcErr::DomainError);
+            }
+            
+            double a = *lower_result.value;
+            double b = *upper_result.value;
+            
+            // Check for improper integrals
+            if (std::isinf(a) || std::isinf(b)) {
+                return EvaluateImproperIntegral(vars, var_name, a, b);
+            }
+            
+            return EvaluateNumericalIntegral(vars, var_name, a, b);
+        }
+        
+        return EvalResult::Failure(CalcErr::OperationNotFound);
+    }
+    
+    NodePtr Derivative(Arena& arena, std::string_view var) const override {
+        // Fundamental Theorem of Calculus for integrals
+        if (func == "integrate" && args.size() == 4) {
+            auto var_node = dynamic_cast<VariableNode*>(args[1]);
+            if (var_node && var_node->name == var) {
+                // d/dx ∫[a(x)]^[b(x)] f(t) dt = f(b(x))·b'(x) - f(a(x))·a'(x)
+                auto f_at_b = args[0]; // Need to substitute var with upper bound
+                auto f_at_a = args[0]; // Need to substitute var with lower bound
+                auto b_prime = args[3]->Derivative(arena, var);
+                auto a_prime = args[2]->Derivative(arena, var);
+                
+                // This is a simplified implementation
+                // In practice, we'd need proper substitution
+                return arena.alloc<NumberNode>(0.0); // Placeholder
+            }
+        }
+        
+        // For limits, derivative is complex and context-dependent
+        return arena.alloc<NumberNode>(0.0); // Placeholder
+    }
+    
+    NodePtr Simplify(Arena& arena) const override {
+        std::vector<NodePtr> simplified_args;
+        for (const auto& arg : args) {
+            simplified_args.push_back(arg->Simplify(arena));
+        }
+        return arena.alloc<MultiArgFunctionNode>(func, std::move(simplified_args));
+    }
+    
+    std::string ToString(Precedence) const override {
+        std::string result = std::string(func) + "(";
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += args[i]->ToString(Precedence::None);
+        }
+        result += ")";
+        return result;
+    }
+
+private:
+    EvalResult EvaluateNumericalLimit(const std::map<std::string, double>& vars, 
+                                    const std::string& var_name, double approach_point) const {
+        constexpr double epsilon = 1e-6;  // Relaxed tolerance
+        constexpr int max_iterations = 20; // Reduced iterations for faster convergence
+        
+        auto evaluate_at = [&](double x) -> std::optional<double> {
+            std::map<std::string, double> local_vars = vars;
+            local_vars[var_name] = x;
+            auto result = args[0]->Evaluate(local_vars);
+            return result.HasValue() ? std::optional<double>(*result.value) : std::nullopt;
+        };
+        
+        // Try direct evaluation first (for continuous functions)
+        auto direct_eval = evaluate_at(approach_point);
+        if (direct_eval.has_value() && std::isfinite(*direct_eval)) {
+            return EvalResult::Success(*direct_eval);
+        }
+        
+        // Approach from both sides with progressively smaller steps
+        std::optional<double> left_limit, right_limit;
+        
+        for (int i = 1; i <= max_iterations; ++i) {
+            double h = std::pow(0.1, i);  // More aggressive step reduction
+            
+            // Left approach
+            auto left_val = evaluate_at(approach_point - h);
+            if (left_val.has_value() && std::isfinite(*left_val)) {
+                left_limit = *left_val;
+            }
+            
+            // Right approach  
+            auto right_val = evaluate_at(approach_point + h);
+            if (right_val.has_value() && std::isfinite(*right_val)) {
+                right_limit = *right_val;
+            }
+            
+            // Check convergence
+            if (left_limit.has_value() && right_limit.has_value()) {
+                if (std::abs(*left_limit - *right_limit) < epsilon) {
+                    return EvalResult::Success((*left_limit + *right_limit) / 2.0);
+                }
+            }
+        }
+        
+        // Return one-sided limit if available
+        if (left_limit.has_value()) return EvalResult::Success(*left_limit);
+        if (right_limit.has_value()) return EvalResult::Success(*right_limit);
+        
+        return EvalResult::Failure(CalcErr::IndeterminateResult);
+    }
+    
+    EvalResult EvaluateLimitAtInfinity(const std::map<std::string, double>& vars,
+                                     const std::string& var_name, bool positive_infinity) const {
+        constexpr int max_iterations = 20;
+        
+        auto evaluate_at = [&](double x) -> std::optional<double> {
+            std::map<std::string, double> local_vars = vars;
+            local_vars[var_name] = x;
+            auto result = args[0]->Evaluate(local_vars);
+            return result.HasValue() ? std::optional<double>(*result.value) : std::nullopt;
+        };
+        
+        std::optional<double> prev_val;
+        
+        for (int i = 1; i <= max_iterations; ++i) {
+            double x = positive_infinity ? std::pow(10.0, i) : -std::pow(10.0, i);
+            auto current_val = evaluate_at(x);
+            
+            if (!current_val.has_value() || !std::isfinite(*current_val)) {
+                continue;
+            }
+            
+            if (prev_val.has_value()) {
+                double diff = std::abs(*current_val - *prev_val);
+                if (diff < 1e-10) {
+                    return EvalResult::Success(*current_val);
+                }
+            }
+            prev_val = *current_val;
+        }
+        
+        // Check for infinite limits
+        if (prev_val.has_value()) {
+            if (std::abs(*prev_val) > 1e10) {
+                return EvalResult::Success(positive_infinity ? 
+                    std::numeric_limits<double>::infinity() : 
+                    -std::numeric_limits<double>::infinity());
+            }
+            return EvalResult::Success(*prev_val);
+        }
+        
+        return EvalResult::Failure(CalcErr::IndeterminateResult);
+    }
+    
+    EvalResult EvaluateNumericalIntegral(const std::map<std::string, double>& vars,
+                                       const std::string& var_name, double a, double b) const {
+        // Adaptive Simpson's Rule with error control
+        constexpr double tolerance = 1e-12;
+        constexpr int max_recursion = 15;
+        
+        auto f = [&](double x) -> double {
+            std::map<std::string, double> local_vars = vars;
+            local_vars[var_name] = x;
+            auto result = args[0]->Evaluate(local_vars);
+            return result.HasValue() ? *result.value : 0.0;
+        };
+        
+        std::function<double(double, double, double, double, double, int)> simpson_adaptive = 
+            [&](double a, double b, double fa, double fb, double fc, int depth) -> double {
+                
+            double h = (b - a) / 2.0;
+            double c = a + h;
+            double fd = f(a + h/2.0);
+            double fe = f(c + h/2.0);
+            
+            double S1 = h/3.0 * (fa + 4*fc + fb);  // Original estimate
+            double S2 = h/6.0 * (fa + 4*fd + 2*fc + 4*fe + fb);  // Refined estimate
+            
+            if (depth >= max_recursion || std::abs(S2 - S1) < 15*tolerance) {
+                return S2 + (S2 - S1)/15.0;  // Richardson extrapolation
+            }
+            
+            return simpson_adaptive(a, c, fa, fc, fd, depth+1) + 
+                   simpson_adaptive(c, b, fc, fb, fe, depth+1);
+        };
+        
+        try {
+            double fa = f(a);
+            double fb = f(b);
+            double fc = f((a + b) / 2.0);
+            
+            // Check for discontinuities or infinite values
+            if (!std::isfinite(fa) || !std::isfinite(fb) || !std::isfinite(fc)) {
+                return EvalResult::Failure(CalcErr::DomainError);
+            }
+            
+            double result = simpson_adaptive(a, b, fa, fb, fc, 0);
+            return EvalResult::Success(result);
+            
+        } catch (...) {
+            return EvalResult::Failure(CalcErr::DomainError);
+        }
+    }
+    
+    EvalResult EvaluateImproperIntegral(const std::map<std::string, double>& vars,
+                                      const std::string& var_name, double a, double b) const {
+        // Handle improper integrals by taking limits
+        constexpr double large_val = 1e6;
+        
+        double effective_a = std::isinf(a) ? (a > 0 ? large_val : -large_val) : a;
+        double effective_b = std::isinf(b) ? (b > 0 ? large_val : -large_val) : b;
+        
+        return EvaluateNumericalIntegral(vars, var_name, effective_a, effective_b);
+    }
+};
+
+// ========================================================
 // ALGEBRAIC PARSER IMPLEMENTATION
 // ========================================================
 
@@ -473,6 +730,21 @@ NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
             else if (c == '(') bracket_depth--;
             else if (bracket_depth == 0) {
                 if (operators.find(c) != std::string_view::npos) {
+                    // Check if this is actually a unary operator (specifically for +/-)
+                    if ((c == '-' || c == '+') && i == 0) {
+                        // This is a unary operator at the start of expression
+                        continue; // Skip this one for binary parsing
+                    }
+                    if ((c == '-' || c == '+') && i > 0) {
+                        // Check if previous character suggests this might be unary
+                        char prev = input[i-1];
+                        if (prev == '(' || prev == '+' || prev == '-' || prev == '*' || prev == '/' || prev == '^') {
+                            // This looks like a unary operator after another operator
+                            continue; // Skip for now
+                        }
+                    }
+                    
+                    // This is a binary operator
                     return arena_.alloc<BinaryOpNode>(c, 
                         ParseExpression(input.substr(0, i)), 
                         ParseExpression(input.substr(i + 1)));
@@ -484,6 +756,18 @@ NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
 
     if (auto node = parse_binary("+-", true)) return node;
     if (auto node = parse_binary("*/", true)) return node;
+
+    // Handle unary operators (after binary parsing fails)
+    if (!input.empty() && input.front() == '-') {
+        // This is a unary minus
+        auto operand = ParseExpression(input.substr(1));
+        return arena_.alloc<UnaryOpNode>("u-", operand);
+    }
+    
+    if (!input.empty() && input.front() == '+') {
+        // Unary plus (identity operator) - just skip it
+        return ParseExpression(input.substr(1));
+    }
 
     // Implicit Mult
     if (input.size() > 1) { 
@@ -518,8 +802,39 @@ NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
     if (paren_start != std::string_view::npos && input.back() == ')') {
         auto func_name = input.substr(0, paren_start);
         while(!func_name.empty() && std::isspace(static_cast<unsigned char>(func_name.back()))) func_name.remove_suffix(1);
-        auto inner = input.substr(paren_start + 1, input.size() - paren_start - 2);
-        return arena_.alloc<UnaryOpNode>(arena_.allocString(func_name), ParseExpression(inner));
+        auto args_str = input.substr(paren_start + 1, input.size() - paren_start - 2);
+        
+        // Check if this is a multi-argument function (limit, integrate, or plot)
+        if (func_name == "limit" || func_name == "integrate" || func_name == "plot") {
+            std::vector<NodePtr> args;
+            
+            // Parse comma-separated arguments
+            size_t start = 0;
+            int paren_depth = 0;
+            
+            for (size_t i = 0; i <= args_str.size(); ++i) {
+                char c = (i < args_str.size()) ? args_str[i] : ','; // Treat end as comma
+                
+                if (c == '(') paren_depth++;
+                else if (c == ')') paren_depth--;
+                else if (c == ',' && paren_depth == 0) {
+                    // Found argument boundary
+                    auto arg_str = args_str.substr(start, i - start);
+                    while (!arg_str.empty() && std::isspace(static_cast<unsigned char>(arg_str.front()))) arg_str.remove_prefix(1);
+                    while (!arg_str.empty() && std::isspace(static_cast<unsigned char>(arg_str.back()))) arg_str.remove_suffix(1);
+                    
+                    if (!arg_str.empty()) {
+                        args.push_back(ParseExpression(arg_str));
+                    }
+                    start = i + 1;
+                }
+            }
+            
+            return arena_.alloc<MultiArgFunctionNode>(arena_.allocString(func_name), std::move(args));
+        } else {
+            // Single-argument function (existing behavior)
+            return arena_.alloc<UnaryOpNode>(arena_.allocString(func_name), ParseExpression(args_str));
+        }
     }
     
     size_t space_pos = input.find(' ');
@@ -738,4 +1053,44 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
     std::vector<double> res;
     for(auto& name : var_names) res.push_back(guess[name]);
     return {EngineSuccessResult(res), {}};
+}
+
+EngineResult AlgebraicParser::HandlePlotFunction(const std::string& input) {
+    // Parse plot(expression, x_min, x_max, y_min, y_max)
+    size_t paren_start = input.find('(');
+    size_t paren_end = input.rfind(')');
+    
+    if (paren_start == std::string::npos || paren_end == std::string::npos) {
+        return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};
+    }
+    
+    std::string args_str = input.substr(paren_start + 1, paren_end - paren_start - 1);
+    
+    // Split arguments by comma (handling nested parentheses)
+    std::vector<std::string> args;
+    size_t start = 0;
+    int paren_depth = 0;
+    
+    for (size_t i = 0; i <= args_str.size(); ++i) {
+        char c = (i < args_str.size()) ? args_str[i] : ',';
+        
+        if (c == '(') paren_depth++;
+        else if (c == ')') paren_depth--;
+        else if (c == ',' && paren_depth == 0) {
+            std::string arg = Utils::Trim(args_str.substr(start, i - start));
+            if (!arg.empty()) {
+                args.push_back(arg);
+            }
+            start = i + 1;
+        }
+    }
+    
+    if (args.size() != 5) {
+        return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};
+    }
+    
+    // For now, return a special string result to indicate this is a plot command
+    // The actual plotting will be handled by the CalcEngine
+    std::string plot_command = "PLOT_FUNCTION:" + args[0] + "," + args[1] + "," + args[2] + "," + args[3] + "," + args[4];
+    return {EngineSuccessResult(plot_command), {}};
 }

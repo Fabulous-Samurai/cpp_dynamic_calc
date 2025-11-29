@@ -1,27 +1,150 @@
-build/
+# Build artifacts and output
+build*/
+cmake-build*/
 out/
 bin/
 lib/
-cmake-build-debug/
-documents/
 *.exe
 *.dll
 *.so
 *.dylib
-*.obj
-*.o
 *.a
 *.lib
+*.obj
+*.o
 *.pdb
 *.ilk
 *.exp
+*.manifest
+*.res
 
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test coverage and reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+tests/reports/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment management
+.python-version
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv_ogulator/
+
+# IDE and editors
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+.ropeproject
 *.sln
 *.vcxproj
 *.vcxproj.filters
 *.vcxproj.user
 
+# Documentation build
+/site
+docs/_build/
+docs/.doctrees/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# OS specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Dependencies
+libs/FTXUI/
+third_party/
+vendor/
+
+# Logs and temporary files
 *.log
 *.tmp
+*.bak
+*.swp
+.cache/
+temp/
+tmp/
+
+# Performance and profiling
+*.prof
+*.trace
+callgrind.out.*
+perf.data
+
+# Generated files
+version.h
+config.h
+autotools.cache/
+
+# Package managers
+conan.lock
+ConanInfo.txt
+.conan/
+vcpkg_installed/
+
+# Enhanced architecture artifacts
+core/engine/generated/
+core/bindings/generated/
+tools/analysis/reports/
+tools/visualization/output/
+examples/*/output/
+scripts/*/logs/
+
+# Archive directories (legacy files)
+archive/

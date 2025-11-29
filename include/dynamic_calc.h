@@ -6,6 +6,10 @@
 #include "symbolic_engine.h"
 #include "statistics_engine.h"
 #include "plot_engine.h"
+#ifdef ENABLE_PYTHON_FFI
+#include "python_parser.h"
+#include "python_engine.h"
+#endif
 #include <map>
 #include <memory>
 #include <string>
@@ -16,7 +20,13 @@ enum class CalcMode {
     Statistics,
     Symbolic,
     Plotting,
-    Units
+    Units,
+    Python,
+    PythonNumPy,
+    PythonSciPy,
+    PythonMatplotlib,
+    PythonPandas,
+    PythonSymPy
 };
 
 class CalcEngine {
@@ -29,6 +39,9 @@ private:
     std::unique_ptr<SymbolicEngine> symbolic_engine_;
     std::unique_ptr<StatisticsEngine> statistics_engine_;
     std::unique_ptr<PlotEngine> plot_engine_;
+#ifdef ENABLE_PYTHON_FFI
+    std::unique_ptr<PythonEngine> python_engine_;
+#endif
 
 public:
     CalcEngine();
@@ -42,4 +55,7 @@ public:
     SymbolicEngine* GetSymbolicEngine() { return symbolic_engine_.get(); }
     StatisticsEngine* GetStatisticsEngine() { return statistics_engine_.get(); }
     PlotEngine* GetPlotEngine() { return plot_engine_.get(); }
+#ifdef ENABLE_PYTHON_FFI
+    PythonEngine* GetPythonEngine() { return python_engine_.get(); }
+#endif
 };
