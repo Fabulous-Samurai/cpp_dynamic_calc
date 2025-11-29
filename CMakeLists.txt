@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
+
+# Proje ve Versiyon
 project(cpp_dynamic_calc VERSION 2.5.0)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -6,34 +8,35 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S")
-
-
-
 configure_file(
     "${CMAKE_SOURCE_DIR}/version.h.in"
     "${CMAKE_BINARY_DIR}/generated/version.h"
 )
 
+
 add_subdirectory(libs/FTXUI)
-
-
 find_package(Threads REQUIRED)
 
 
-add_executable(cpp_dynamic_calc
-        dynamic_calc.cpp
-        dynamic_calc.h
-        main.cpp
-        dynamic_calc_types.h
-        iParser.h
-        algebraic_parser.h
-        algebraic_parser.cpp
-        linear_system_parser.cpp
-        linear_system_parser.h
-        string_helpers.h
+include_directories(
+    "${CMAKE_SOURCE_DIR}/include"
+    "${CMAKE_BINARY_DIR}/generated"
 )
 
-target_include_directories(cpp_dynamic_calc PRIVATE "${CMAKE_BINARY_DIR}/generated")
+
+add_executable(cpp_dynamic_calc
+        src/main.cpp
+        src/dynamic_calc.cpp
+        src/algebraic_parser.cpp
+        src/linear_system_parser.cpp
+        
+        include/dynamic_calc.h
+        include/dynamic_calc_types.h
+        include/iParser.h
+        include/algebraic_parser.h
+        include/linear_system_parser.h
+        include/string_helpers.h
+)
 
 target_link_libraries(cpp_dynamic_calc 
     PRIVATE 
@@ -45,16 +48,12 @@ target_link_libraries(cpp_dynamic_calc
 
 
 add_executable(run_tests
-        tests.cpp
-        dynamic_calc.cpp 
-        dynamic_calc.h
-        dynamic_calc_types.h
-        iParser.h
-        algebraic_parser.h
-        algebraic_parser.cpp
-        linear_system_parser.cpp
-        linear_system_parser.h
-        string_helpers.h
+        tests/tests.cpp
+        src/dynamic_calc.cpp
+        src/algebraic_parser.cpp
+        src/linear_system_parser.cpp
+        include/dynamic_calc.h
+        include/string_helpers.h
 )
 
 target_link_libraries(run_tests 
@@ -66,5 +65,5 @@ target_link_libraries(run_tests
 )
 
 
-add_executable(ast_drills ast_drills.cpp)
-
+add_executable(ast_drills tests/ast_drills.cpp)
+target_include_directories(ast_drills PRIVATE "${CMAKE_SOURCE_DIR}/include")

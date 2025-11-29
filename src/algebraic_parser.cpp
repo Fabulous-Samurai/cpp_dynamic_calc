@@ -1,7 +1,7 @@
 /**
  * @file algebraic_parser.cpp
  * @brief Implementation of the Algebraic Parser using AST.
- * FIX: Final correction for 'my_prec' variable name typo in ToString.
+ * RESTORED: Full functionality including Evaluate, Derivative, and Simplify logic.
  */
 
 #include "algebraic_parser.h"
@@ -14,14 +14,14 @@
 
 // --- Helpers ---
 
-// Returns Precedence Enum (matches header)
 Precedence GetOpPrecedence(char op) {
-    if (op == '+' || op == '-') return Precedence::AddSub;   // Level 1
-    if (op == '*' || op == '/') return Precedence::MultiDiv; // Level 2
-    if (op == '^') return Precedence::Pow;                   // Level 3
-    return Precedence::None; // Level 0
+    if (op == '+' || op == '-') return Precedence::AddSub;
+    if (op == '*' || op == '/') return Precedence::MultiDiv;
+    if (op == '^') return Precedence::Pow;
+    return Precedence::None;
 }
 
+// Bu fonksiyon Evaluate'i kullanır! Silinirse sadeleştirme bozulur.
 bool IsConst(const NodePtr node, double val) {
     try { return std::abs(node->Evaluate({}) - val) < 1e-9; } catch (...) { return false; }
 }
@@ -41,10 +41,11 @@ struct NumberNode : ExprNode {
     double value;
     NumberNode(double v) : value(v) {}
     
+    // Evaluate SİLİNMEMELİ! Hesaplama burada yapılır.
     double Evaluate(const std::map<std::string, double>&) const override { return value; }
+    
     NodePtr Derivative(Arena& arena, std::string_view) const override { return arena.alloc<NumberNode>(0.0); }
     NodePtr Simplify(Arena& arena) const override { return arena.alloc<NumberNode>(value); }
-    
     std::string ToString(Precedence) const override { return FormatNumber(value); }
 };
 
@@ -58,12 +59,12 @@ struct VariableNode : ExprNode {
         if (key == "Ans") return 0.0;
         throw std::runtime_error("Undefined variable: " + key);
     }
+    
     NodePtr Derivative(Arena& arena, std::string_view var) const override {
         if (name == var) return arena.alloc<NumberNode>(1.0);
         return arena.alloc<NumberNode>(0.0);
     }
     NodePtr Simplify(Arena& arena) const override { return arena.alloc<VariableNode>(name); }
-    
     std::string ToString(Precedence) const override { return std::string(name); }
 };
 
@@ -71,6 +72,7 @@ struct BinaryOpNode : ExprNode {
     char op; NodePtr left, right;
     BinaryOpNode(char c, NodePtr l, NodePtr r) : op(c), left(l), right(r) {}
     
+    // [KRİTİK] Bu fonksiyonu silersen NaN alırsın!
     double Evaluate(const std::map<std::string, double>& vars) const override {
         double l = left->Evaluate(vars);
         double r = right->Evaluate(vars);
@@ -94,6 +96,13 @@ struct BinaryOpNode : ExprNode {
             auto t2 = arena.alloc<BinaryOpNode>('*', left, dr);
             return arena.alloc<BinaryOpNode>('+', t1, t2);
         }
+        if (op == '/') {
+            auto t1 = arena.alloc<BinaryOpNode>('*', dl, right);
+            auto t2 = arena.alloc<BinaryOpNode>('*', left, dr);
+            auto num = arena.alloc<BinaryOpNode>('-', t1, t2);
+            auto den = arena.alloc<BinaryOpNode>('^', right, arena.alloc<NumberNode>(2.0));
+            return arena.alloc<BinaryOpNode>('/', num, den);
+        }
         if (op == '^') {
             auto n_minus_1 = arena.alloc<BinaryOpNode>('-', right, arena.alloc<NumberNode>(1.0));
             auto u_pow = arena.alloc<BinaryOpNode>('^', left, n_minus_1);
@@ -107,6 +116,7 @@ struct BinaryOpNode : ExprNode {
         auto simple_left = left->Simplify(arena);
         auto simple_right = right->Simplify(arena);
 
+        // Constant Folding (Evaluate burada kullanılıyor!)
         bool l_const = false, r_const = false;
         double l_val = 0, r_val = 0;
         try { l_val = simple_left->Evaluate({}); l_const = true; } catch(...) {}
@@ -116,6 +126,8 @@ struct BinaryOpNode : ExprNode {
             if (op == '+') return arena.alloc<NumberNode>(l_val + r_val);
             if (op == '-') return arena.alloc<NumberNode>(l_val - r_val);
             if (op == '*') return arena.alloc<NumberNode>(l_val * r_val);
+            if (op == '/' && r_val != 0) return arena.alloc<NumberNode>(l_val / r_val);
+            if (op == '^') return arena.alloc<NumberNode>(std::pow(l_val, r_val));
         }
 
         if (op == '+') {
@@ -133,20 +145,20 @@ struct BinaryOpNode : ExprNode {
             if (IsConst(simple_right, 1.0)) return simple_left;
             if (IsConst(simple_right, 0.0)) return arena.alloc<NumberNode>(1.0);
         }
+        else if (op == '/') {
+            if (IsConst(simple_left, 0.0)) return arena.alloc<NumberNode>(0.0);
+            if (IsConst(simple_right, 1.0)) return simple_left;
+            if (simple_left->ToString(Precedence::None) == simple_right->ToString(Precedence::None)) 
+                return arena.alloc<NumberNode>(1.0);
+        }
 
         return arena.alloc<BinaryOpNode>(op, simple_left, simple_right);
     }
 
-    // [CORRECTED] Use 'my_prec' consistently
     std::string ToString(Precedence parent_prec) const override {
         Precedence my_prec = GetOpPrecedence(op);
-        
-        // Corrected line: passing 'my_prec' to both children
-        std::string result = left->ToString(my_prec) + " " + op + " " + right->ToString(my_prec);
-        
-        if (static_cast<int>(my_prec) < static_cast<int>(parent_prec)) {
-            return "(" + result + ")";
-        }
+        std::string result = left->ToString(my_prec) + " " + op + " " + right->ToString(my_prec); 
+        if (static_cast<int>(my_prec) < static_cast<int>(parent_prec)) return "(" + result + ")";
         return result;
     }
 };
@@ -155,13 +167,32 @@ struct UnaryOpNode : ExprNode {
     std::string_view func; NodePtr operand;
     UnaryOpNode(std::string_view f, NodePtr op) : func(f), operand(op) {}
     
+    // [KRİTİK] Burayı da silme! Fonksiyonların sayısal hesabı buradadır.
     double Evaluate(const std::map<std::string, double>& vars) const override {
         double val = operand->Evaluate(vars);
         if (func == "sin") return std::sin(val * D2R);
         if (func == "cos") return std::cos(val * D2R);
         if (func == "tan") return std::tan(val * D2R);
-        if (func == "sqrt") return (val >= 0) ? std::sqrt(val) : throw std::runtime_error("Negative sqrt");
-        if (func == "log") return (val > 0) ? std::log10(val) : throw std::runtime_error("Log domain error");
+        if (func == "cot") return 1.0 / std::tan(val * D2R);
+        if (func == "sec") return 1.0 / std::cos(val * D2R);
+        if (func == "csc") return 1.0 / std::sin(val * D2R);
+        
+        if (func == "asin") return std::asin(val) * R2D;
+        if (func == "acos") return std::acos(val) * R2D;
+        if (func == "atan") return std::atan(val) * R2D;
+        
+        if (func == "sinh") return std::sinh(val);
+        if (func == "cosh") return std::cosh(val);
+        if (func == "tanh") return std::tanh(val);
+        
+        if (func == "sqrt") { if (val < 0) throw std::runtime_error("Negative sqrt"); return std::sqrt(val); }
+        if (func == "cbrt") return std::cbrt(val);
+        if (func == "abs") return std::abs(val);
+        if (func == "ln") { if (val <= 0) throw std::runtime_error("Log domain error"); return std::log(val); }
+        if (func == "log") { if (val <= 0) throw std::runtime_error("Log domain error"); return std::log10(val); }
+        if (func == "log2" || func == "lg") { if (val <= 0) throw std::runtime_error("Log domain error"); return std::log2(val); }
+        if (func == "exp") return std::exp(val);
+        
         if (func == "u-") return -val;
         return 0.0;
     }
@@ -169,6 +200,7 @@ struct UnaryOpNode : ExprNode {
     NodePtr Derivative(Arena& arena, std::string_view var) const override {
         auto d_inner = operand->Derivative(arena, var);
         if (func == "u-") return arena.alloc<UnaryOpNode>("u-", d_inner);
+        
         if (func == "sin") {
             auto cos_u = arena.alloc<UnaryOpNode>("cos", operand);
             return arena.alloc<BinaryOpNode>('*', cos_u, d_inner);
@@ -178,6 +210,28 @@ struct UnaryOpNode : ExprNode {
             auto neg_sin = arena.alloc<UnaryOpNode>("u-", sin_u);
             return arena.alloc<BinaryOpNode>('*', neg_sin, d_inner);
         }
+        if (func == "tan") {
+            auto sec_u = arena.alloc<UnaryOpNode>("sec", operand);
+            auto sec_sq = arena.alloc<BinaryOpNode>('^', sec_u, arena.alloc<NumberNode>(2.0));
+            return arena.alloc<BinaryOpNode>('*', sec_sq, d_inner);
+        }
+        if (func == "ln") return arena.alloc<BinaryOpNode>('/', d_inner, operand);
+        if (func == "log2" || func == "lg") {
+            auto ln2 = arena.alloc<NumberNode>(std::log(2.0));
+            auto denom = arena.alloc<BinaryOpNode>('*', operand, ln2);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "sqrt") {
+            auto two = arena.alloc<NumberNode>(2.0);
+            auto sqrt_u = arena.alloc<UnaryOpNode>("sqrt", operand);
+            auto denom = arena.alloc<BinaryOpNode>('*', two, sqrt_u);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "exp") {
+            auto exp_u = arena.alloc<UnaryOpNode>("exp", operand);
+            return arena.alloc<BinaryOpNode>('*', exp_u, d_inner);
+        }
+        
         return arena.alloc<NumberNode>(0.0);
     }
 
@@ -232,7 +286,7 @@ NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
     if (auto node = parse_binary("+-", true)) return node;
     if (auto node = parse_binary("*/", true)) return node;
 
-    // Implicit Multiplication
+    // Implicit Mult
     if (input.size() > 1) { 
         int bracket_depth = 0;
         for (size_t i = 0; i < input.size() - 1; ++i) {
@@ -373,7 +427,6 @@ EngineResult AlgebraicParser::HandleDerivative(const std::string& input) {
     expression = Utils::Trim(expression);
     if (!expression.empty() && expression.back() == ';') expression.pop_back();
     var = "x"; 
-
     try {
         NodePtr root = ParseExpression(expression);
         NodePtr derivative = root->Derivative(arena_, var);
@@ -397,35 +450,27 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
     const double epsilon = 1e-5;
     std::vector<NodePtr> roots;
     for(const auto& eq : equation_strs) roots.push_back(ParseExpression(eq));
-
     std::vector<std::string> var_names;
     for(auto const& [key, val] : guess) var_names.push_back(key);
     int n = var_names.size();
-
     for (int iter = 0; iter < max_iter; ++iter) {
         std::vector<double> F(n);
         for(int i=0; i<n; ++i) {
             try { F[i] = roots[i]->Evaluate(guess); } 
             catch (...) { return {{}, EngineErrorResult(CalcErr::DomainError)}; }
         }
-
         double err = 0; for(double v:F) err+=v*v;
         if(std::sqrt(err) < 1e-6) break;
-
         std::vector<std::vector<double>> J(n, std::vector<double>(n));
         for (int j = 0; j < n; ++j) {
             std::string v = var_names[j];
             double old = guess[v];
             guess[v] += epsilon;
-            for (int i = 0; i < n; ++i) {
-                J[i][j] = (roots[i]->Evaluate(guess) - F[i]) / epsilon;
-            }
+            for (int i = 0; i < n; ++i) J[i][j] = (roots[i]->Evaluate(guess) - F[i]) / epsilon;
             guess[v] = old;
         }
-
         std::vector<double> neg_F = F;
         for(double& val : neg_F) val = -val;
-        
         auto SolveLinearSystemSmall = [](std::vector<std::vector<double>> A, std::vector<double> b) {
             int n = A.size();
             for (int i=0; i<n; ++i) {
@@ -444,7 +489,6 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
             }
             return b;
         };
-
         std::vector<double> d = SolveLinearSystemSmall(J, neg_F);
         for(int i=0; i<n; ++i) guess[var_names[i]] += d[i];
     }
