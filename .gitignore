@@ -2,7 +2,7 @@ build/
 out/
 bin/
 lib/
-
+documents/
 *.exe
 *.dll
 *.so
