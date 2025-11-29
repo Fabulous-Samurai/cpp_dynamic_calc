@@ -12,6 +12,7 @@
 #include <cmath>
 #include <charconv>
 #include <optional>
+#include <unordered_map>
 
 // ========================================================
 // 1. MEMORY ARENA (High Performance Allocation)
@@ -58,9 +59,27 @@ public:
 struct ExprNode;
 using NodePtr = ExprNode*;
 
+struct EvalResult {
+    std::optional<double> value;
+    CalcErr error = CalcErr::None;
+
+    static EvalResult Success(double val) {
+        EvalResult result;
+        result.value = val;
+        result.error = CalcErr::None;
+        return result;
+    }
+    static EvalResult Failure(CalcErr err) {
+        EvalResult result;
+        result.error = err;
+        return result;
+    }
+    bool HasValue() const { return value.has_value() && error == CalcErr::None; }
+};
+
 struct ExprNode {
     virtual ~ExprNode() = default;
-    virtual double Evaluate(const std::map<std::string, double>& vars) const = 0;
+    virtual EvalResult Evaluate(const std::map<std::string, double>& vars) const = 0;
     virtual NodePtr Derivative(Arena& arena, std::string_view var) const = 0;
     virtual NodePtr Simplify(Arena& arena) const = 0;
 
@@ -87,6 +106,11 @@ public:
 private:
     Arena arena_;
     mutable std::shared_mutex mutex_s;
+
+    // Performance: Expression memoization cache
+    mutable std::unordered_map<std::string, EvalResult> eval_cache_;
+    mutable std::unordered_map<std::string, NodePtr> parse_cache_;
+    static constexpr size_t MAX_CACHE_SIZE = 1000;
 
     struct CommandEntry { std::string command; std::function<EngineResult(const std::string&)> handler; };
     std::vector<CommandEntry> special_commands_;

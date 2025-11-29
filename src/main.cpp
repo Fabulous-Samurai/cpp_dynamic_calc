@@ -44,6 +44,14 @@ void PrintHelp(std::vector<HistoryLine>& history, const std::string& target) {
         history.push_back({"[MODES]", Color::Yellow, true});
         history.push_back({"  mode algebraic : Scientific calc", Color::White, false});
         history.push_back({"  mode linear    : Matrix/System solver", Color::White, false});
+        history.push_back({"  mode stats     : Statistical analysis", Color::White, false});
+        history.push_back({"  mode symbolic  : Symbolic math (placeholder)", Color::White, false});
+        history.push_back({"  mode plot      : Function plotting", Color::White, false});
+        history.push_back({"  mode units     : Unit conversions", Color::White, false});
+        history.push_back({"[SPECIAL COMMANDS]", Color::Yellow, true});
+        history.push_back({"  plot sin(x)    : Plot function (any mode)", Color::White, false});
+        history.push_back({"  convert 5 m to ft : Unit conversion", Color::White, false});
+        history.push_back({"  derive x^2     : Symbolic derivative", Color::White, false});
         history.push_back({"-------------------------", Color::Cyan, false});
         return;
     }
@@ -62,6 +70,10 @@ void AddResultToHistory(const EngineResult& result, std::vector<HistoryLine>& hi
                     case CalcErr::DomainError: msg += "Domain Error!"; break;
                     case CalcErr::OperationNotFound: msg += "Operation Not Found!"; break;
                     case CalcErr::ArgumentMismatch: msg += "Syntax/Argument Error!"; break;
+                    case CalcErr::NumericOverflow: msg += "Numeric Overflow!"; break;
+                    case CalcErr::StackOverflow: msg += "Stack Overflow!"; break;
+                    case CalcErr::MemoryExhausted: msg += "Memory Exhausted!"; break;
+                    case CalcErr::InfiniteLoop: msg += "Infinite Loop Detected!"; break;
                     default: msg += "Unknown Algebraic Error!"; break;
                 }
                 history.push_back({msg, Color::Red, true});
@@ -179,6 +191,22 @@ int main() {
                     engine.SetMode(CalcMode::LinearSystem);
                     mode_str = "LINEAR SYS";
                     history.push_back({"Switched to LINEAR SYSTEM", Color::Yellow, true});
+                } else if (cmd == "mode stats") {
+                    engine.SetMode(CalcMode::Statistics);
+                    mode_str = "STATISTICS";
+                    history.push_back({"Switched to STATISTICS mode", Color::Yellow, true});
+                } else if (cmd == "mode symbolic") {
+                    engine.SetMode(CalcMode::Symbolic);
+                    mode_str = "SYMBOLIC";
+                    history.push_back({"Switched to SYMBOLIC mode", Color::Yellow, true});
+                } else if (cmd == "mode plot") {
+                    engine.SetMode(CalcMode::Plotting);
+                    mode_str = "PLOTTING";
+                    history.push_back({"Switched to PLOTTING mode", Color::Yellow, true});
+                } else if (cmd == "mode units") {
+                    engine.SetMode(CalcMode::Units);
+                    mode_str = "UNITS";
+                    history.push_back({"Switched to UNITS mode", Color::Yellow, true});
                 } else {
                     engine.SetMode(CalcMode::Algebraic);
                     mode_str = "ALGEBRAIC";

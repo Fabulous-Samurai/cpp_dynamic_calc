@@ -6,6 +6,7 @@
 
 #include "algebraic_parser.h"
 #include "string_helpers.h"
+#include <exception>
 #include <iostream>
 #include <cmath>
 #include <sstream>
@@ -21,9 +22,15 @@ Precedence GetOpPrecedence(char op) {
     return Precedence::None;
 }
 
-// Bu fonksiyon Evaluate'i kullanır! Silinirse sadeleştirme bozulur.
+
 bool IsConst(const NodePtr node, double val) {
-    try { return std::abs(node->Evaluate({}) - val) < 1e-9; } catch (...) { return false; }
+    auto res = node->Evaluate({});
+    if (!res.value.has_value()) return false;
+    return std::abs(*res.value - val) < 1e-9;
+}
+
+CalcErr NormalizeError(const EvalResult& res, CalcErr fallback = CalcErr::ArgumentMismatch) {
+    return res.error == CalcErr::None ? fallback : res.error;
 }
 
 std::string FormatNumber(double val) {
@@ -41,8 +48,8 @@ struct NumberNode : ExprNode {
     double value;
     NumberNode(double v) : value(v) {}
     
-    // Evaluate SİLİNMEMELİ! Hesaplama burada yapılır.
-    double Evaluate(const std::map<std::string, double>&) const override { return value; }
+    
+    EvalResult Evaluate(const std::map<std::string, double>&) const override { return EvalResult::Success(value); }
     
     NodePtr Derivative(Arena& arena, std::string_view) const override { return arena.alloc<NumberNode>(0.0); }
     NodePtr Simplify(Arena& arena) const override { return arena.alloc<NumberNode>(value); }
@@ -53,11 +60,12 @@ struct VariableNode : ExprNode {
     std::string_view name;
     VariableNode(std::string_view n) : name(n) {}
     
-    double Evaluate(const std::map<std::string, double>& vars) const override {
+    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
         std::string key(name);
-        if (vars.count(key)) return vars.at(key);
-        if (key == "Ans") return 0.0;
-        throw std::runtime_error("Undefined variable: " + key);
+        auto it = vars.find(key);
+        if (it != vars.end()) return EvalResult::Success(it->second);
+        if (key == "Ans") return EvalResult::Success(0.0);
+        return EvalResult::Failure(CalcErr::ArgumentMismatch);
     }
     
     NodePtr Derivative(Arena& arena, std::string_view var) const override {
@@ -73,16 +81,36 @@ struct BinaryOpNode : ExprNode {
     BinaryOpNode(char c, NodePtr l, NodePtr r) : op(c), left(l), right(r) {}
     
     // [KRİTİK] Bu fonksiyonu silersen NaN alırsın!
-    double Evaluate(const std::map<std::string, double>& vars) const override {
-        double l = left->Evaluate(vars);
-        double r = right->Evaluate(vars);
+    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+        auto left_eval = left->Evaluate(vars);
+        if (!left_eval.HasValue()) return left_eval;
+        auto right_eval = right->Evaluate(vars);
+        if (!right_eval.HasValue()) return right_eval;
+        double l = *left_eval.value;
+        double r = *right_eval.value;
         switch(op) {
-            case '+': return l + r;
-            case '-': return l - r;
-            case '*': return l * r;
-            case '/': return (r != 0.0) ? l / r : throw std::runtime_error("Division by zero");
-            case '^': return std::pow(l, r);
-            default: return 0.0;
+            case '+': {
+                auto safe_result = SafeMath::SafeAdd(l, r);
+                return safe_result ? EvalResult::Success(*safe_result) : EvalResult::Failure(CalcErr::NumericOverflow);
+            }
+            case '-': {
+                auto safe_result = SafeMath::SafeAdd(l, -r);
+                return safe_result ? EvalResult::Success(*safe_result) : EvalResult::Failure(CalcErr::NumericOverflow);
+            }
+            case '*': {
+                if (!SafeMath::IsFiniteAndSafe(l * r)) return EvalResult::Failure(CalcErr::NumericOverflow);
+                return EvalResult::Success(l * r);
+            }
+            case '/': {
+                if (r == 0.0) return EvalResult::Failure(CalcErr::DivideByZero);
+                if (!SafeMath::IsFiniteAndSafe(l / r)) return EvalResult::Failure(CalcErr::NumericOverflow);
+                return EvalResult::Success(l / r);
+            }
+            case '^': {
+                auto safe_result = SafeMath::SafePow(l, r);
+                return safe_result ? EvalResult::Success(*safe_result) : EvalResult::Failure(CalcErr::NumericOverflow);
+            }
+            default: return EvalResult::Success(0.0);
         }
     }
     
@@ -116,11 +144,13 @@ struct BinaryOpNode : ExprNode {
         auto simple_left = left->Simplify(arena);
         auto simple_right = right->Simplify(arena);
 
-        // Constant Folding (Evaluate burada kullanılıyor!)
+       
         bool l_const = false, r_const = false;
         double l_val = 0, r_val = 0;
-        try { l_val = simple_left->Evaluate({}); l_const = true; } catch(...) {}
-        try { r_val = simple_right->Evaluate({}); r_const = true; } catch(...) {}
+        auto l_eval = simple_left->Evaluate({});
+        if (l_eval.value.has_value()) { l_const = true; l_val = *l_eval.value; }
+        auto r_eval = simple_right->Evaluate({});
+        if (r_eval.value.has_value()) { r_const = true; r_val = *r_eval.value; }
 
         if (l_const && r_const) {
             if (op == '+') return arena.alloc<NumberNode>(l_val + r_val);
@@ -167,34 +197,61 @@ struct UnaryOpNode : ExprNode {
     std::string_view func; NodePtr operand;
     UnaryOpNode(std::string_view f, NodePtr op) : func(f), operand(op) {}
     
-    // [KRİTİK] Burayı da silme! Fonksiyonların sayısal hesabı buradadır.
-    double Evaluate(const std::map<std::string, double>& vars) const override {
-        double val = operand->Evaluate(vars);
-        if (func == "sin") return std::sin(val * D2R);
-        if (func == "cos") return std::cos(val * D2R);
-        if (func == "tan") return std::tan(val * D2R);
-        if (func == "cot") return 1.0 / std::tan(val * D2R);
-        if (func == "sec") return 1.0 / std::cos(val * D2R);
-        if (func == "csc") return 1.0 / std::sin(val * D2R);
+  
+    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+        auto inner = operand->Evaluate(vars);
+        if (!inner.HasValue()) return inner;
+        double val = *inner.value;
+        if (func == "sin") return EvalResult::Success(std::sin(val * D2R));
+        if (func == "cos") return EvalResult::Success(std::cos(val * D2R));
+        if (func == "tan") return EvalResult::Success(std::tan(val * D2R));
+        if (func == "cot") return EvalResult::Success(1.0 / std::tan(val * D2R));
+        if (func == "sec") return EvalResult::Success(1.0 / std::cos(val * D2R));
+        if (func == "csc") return EvalResult::Success(1.0 / std::sin(val * D2R));
         
-        if (func == "asin") return std::asin(val) * R2D;
-        if (func == "acos") return std::acos(val) * R2D;
-        if (func == "atan") return std::atan(val) * R2D;
+        if (func == "asin") return EvalResult::Success(std::asin(val) * R2D);
+        if (func == "acos") return EvalResult::Success(std::acos(val) * R2D);
+        if (func == "atan") return EvalResult::Success(std::atan(val) * R2D);
+        if (func == "acot") return EvalResult::Success(std::atan(1.0 / val) * R2D);
+        if (func == "asec") return EvalResult::Success(std::acos(1.0 / val) * R2D);
+        if (func == "acsc") return EvalResult::Success(std::asin(1.0 / val) * R2D);
         
-        if (func == "sinh") return std::sinh(val);
-        if (func == "cosh") return std::cosh(val);
-        if (func == "tanh") return std::tanh(val);
+        if (func == "sinh") return EvalResult::Success(std::sinh(val));
+        if (func == "cosh") return EvalResult::Success(std::cosh(val));
+        if (func == "tanh") return EvalResult::Success(std::tanh(val));
+        if (func == "coth") return EvalResult::Success(1.0 / std::tanh(val));
+        if (func == "sech") return EvalResult::Success(1.0 / std::cosh(val));
+        if (func == "csch") return EvalResult::Success(1.0 / std::sinh(val));
         
-        if (func == "sqrt") { if (val < 0) throw std::runtime_error("Negative sqrt"); return std::sqrt(val); }
-        if (func == "cbrt") return std::cbrt(val);
-        if (func == "abs") return std::abs(val);
-        if (func == "ln") { if (val <= 0) throw std::runtime_error("Log domain error"); return std::log(val); }
-        if (func == "log") { if (val <= 0) throw std::runtime_error("Log domain error"); return std::log10(val); }
-        if (func == "log2" || func == "lg") { if (val <= 0) throw std::runtime_error("Log domain error"); return std::log2(val); }
-        if (func == "exp") return std::exp(val);
+        if (func == "asinh") return EvalResult::Success(std::asinh(val));
+        if (func == "acosh") return EvalResult::Success(std::acosh(val));
+        if (func == "atanh") return EvalResult::Success(std::atanh(val));
+        if (func == "acoth") return EvalResult::Success(std::atanh(1.0 / val));
+        if (func == "asech") return EvalResult::Success(std::asinh(1.0 / val));
+        if (func == "acsch") return EvalResult::Success(std::asinh(1.0 / val));
+
+        if (func == "sqrt") {
+            if (val < 0) return EvalResult::Failure(CalcErr::NegativeRoot);
+            return EvalResult::Success(std::sqrt(val));
+        }
+        if (func == "cbrt") return EvalResult::Success(std::cbrt(val));
+        if (func == "abs") return EvalResult::Success(std::abs(val));
+        if (func == "ln") {
+            if (val <= 0) return EvalResult::Failure(CalcErr::DomainError);
+            return EvalResult::Success(std::log(val));
+        }
+        if (func == "log") {
+            if (val <= 0) return EvalResult::Failure(CalcErr::DomainError);
+            return EvalResult::Success(std::log10(val));
+        }
+        if (func == "log2" || func == "lg") {
+            if (val <= 0) return EvalResult::Failure(CalcErr::DomainError);
+            return EvalResult::Success(std::log2(val));
+        }
+        if (func == "exp") return EvalResult::Success(std::exp(val));
         
-        if (func == "u-") return -val;
-        return 0.0;
+        if (func == "u-") return EvalResult::Success(-val);
+        return EvalResult::Success(0.0);
     }
     
     NodePtr Derivative(Arena& arena, std::string_view var) const override {
@@ -215,6 +272,25 @@ struct UnaryOpNode : ExprNode {
             auto sec_sq = arena.alloc<BinaryOpNode>('^', sec_u, arena.alloc<NumberNode>(2.0));
             return arena.alloc<BinaryOpNode>('*', sec_sq, d_inner);
         }
+        if (func == "cot") {
+            auto csc_u = arena.alloc<UnaryOpNode>("csc", operand);
+            auto csc_sq = arena.alloc<BinaryOpNode>('^', csc_u, arena.alloc<NumberNode>(2.0));
+            auto neg = arena.alloc<UnaryOpNode>("u-", csc_sq);
+            return arena.alloc<BinaryOpNode>('*', neg, d_inner);
+        }
+        if (func == "sec") {
+            auto sec_u = arena.alloc<UnaryOpNode>("sec", operand);
+            auto tan_u = arena.alloc<UnaryOpNode>("tan", operand);
+            auto prod = arena.alloc<BinaryOpNode>('*', sec_u, tan_u);
+            return arena.alloc<BinaryOpNode>('*', prod, d_inner);
+        }
+        if (func == "csc") {
+            auto csc_u = arena.alloc<UnaryOpNode>("csc", operand);
+            auto cot_u = arena.alloc<UnaryOpNode>("cot", operand);
+            auto prod = arena.alloc<BinaryOpNode>('*', csc_u, cot_u);
+            auto neg = arena.alloc<UnaryOpNode>("u-", prod);
+            return arena.alloc<BinaryOpNode>('*', neg, d_inner);
+        }
         if (func == "ln") return arena.alloc<BinaryOpNode>('/', d_inner, operand);
         if (func == "log2" || func == "lg") {
             auto ln2 = arena.alloc<NumberNode>(std::log(2.0));
@@ -230,6 +306,129 @@ struct UnaryOpNode : ExprNode {
         if (func == "exp") {
             auto exp_u = arena.alloc<UnaryOpNode>("exp", operand);
             return arena.alloc<BinaryOpNode>('*', exp_u, d_inner);
+        }
+        if (func == "asin") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('-', one, inner_sq);
+            auto denom = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "acos") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('-', one, inner_sq);
+            auto denom = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            auto neg = arena.alloc<UnaryOpNode>("u-", arena.alloc<BinaryOpNode>('/', d_inner, denom));
+            return neg;
+        }
+        if (func == "atan") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto denom = arena.alloc<BinaryOpNode>('+', one, inner_sq);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "acot") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto denom = arena.alloc<BinaryOpNode>('-', inner_sq, one);
+            auto neg = arena.alloc<UnaryOpNode>("u-", arena.alloc<BinaryOpNode>('/', d_inner, denom));
+            return neg;
+        }
+        if (func == "asec") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('-', inner_sq, one);
+            auto sqrt = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            auto denom = arena.alloc<BinaryOpNode>('*', operand, sqrt);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "acsc") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('-', inner_sq, one);
+            auto sqrt = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            auto denom = arena.alloc<BinaryOpNode>('*', operand, sqrt);
+            auto neg = arena.alloc<UnaryOpNode>("u-", arena.alloc<BinaryOpNode>('/', d_inner, denom));
+            return neg;
+        }
+        if (func == "sinh") {
+            auto cosh_u = arena.alloc<UnaryOpNode>("cosh", operand);
+            return arena.alloc<BinaryOpNode>('*', cosh_u, d_inner);
+        }
+        if (func == "cosh") {
+            auto sinh_u = arena.alloc<UnaryOpNode>("sinh", operand);
+            return arena.alloc<BinaryOpNode>('*', sinh_u, d_inner);
+        }
+        if (func == "tanh") {
+            auto sech_u = arena.alloc<UnaryOpNode>("sech", operand);
+            auto sech_sq = arena.alloc<BinaryOpNode>('^', sech_u, arena.alloc<NumberNode>(2.0));
+            return arena.alloc<BinaryOpNode>('*', sech_sq, d_inner);
+        }
+        if (func == "coth") {
+            auto csch_u = arena.alloc<UnaryOpNode>("csch", operand);
+            auto csch_sq = arena.alloc<BinaryOpNode>('^', csch_u, arena.alloc<NumberNode>(2.0));
+            auto neg = arena.alloc<UnaryOpNode>("u-", csch_sq);
+            return arena.alloc<BinaryOpNode>('*', neg, d_inner);
+        }
+        if (func == "sech") {
+            auto sech_u = arena.alloc<UnaryOpNode>("sech", operand);
+            auto tanh_u = arena.alloc<UnaryOpNode>("tanh", operand);
+            auto prod = arena.alloc<BinaryOpNode>('*', sech_u, tanh_u);
+            auto neg = arena.alloc<UnaryOpNode>("u-", prod);
+            return arena.alloc<BinaryOpNode>('*', neg, d_inner);
+        }
+        if (func == "csch") {
+            auto csch_u = arena.alloc<UnaryOpNode>("csch", operand);
+            auto coth_u = arena.alloc<UnaryOpNode>("coth", operand);
+            auto prod = arena.alloc<BinaryOpNode>('*', csch_u, coth_u);
+            auto neg = arena.alloc<UnaryOpNode>("u-", prod);
+            return arena.alloc<BinaryOpNode>('*', neg, d_inner);
+        }
+        if (func == "asinh") {
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('+', inner_sq, arena.alloc<NumberNode>(1.0));
+            auto sqrt = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            return arena.alloc<BinaryOpNode>('/', d_inner, sqrt);
+        }
+        if (func == "acosh") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto minus = arena.alloc<BinaryOpNode>('-', operand, one);
+            auto plus = arena.alloc<BinaryOpNode>('+', operand, one);
+            auto sqrt1 = arena.alloc<UnaryOpNode>("sqrt", minus);
+            auto sqrt2 = arena.alloc<UnaryOpNode>("sqrt", plus);
+            auto denom = arena.alloc<BinaryOpNode>('*', sqrt1, sqrt2);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "atanh") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto denom = arena.alloc<BinaryOpNode>('-', one, inner_sq);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "acoth") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto denom = arena.alloc<BinaryOpNode>('-', one, inner_sq);
+            return arena.alloc<BinaryOpNode>('/', d_inner, denom);
+        }
+        if (func == "asech") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('-', one, inner_sq);
+            auto sqrt = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            auto denom = arena.alloc<BinaryOpNode>('*', operand, sqrt);
+            auto neg = arena.alloc<UnaryOpNode>("u-", arena.alloc<BinaryOpNode>('/', d_inner, denom));
+            return neg;
+        }
+        if (func == "acsch") {
+            auto one = arena.alloc<NumberNode>(1.0);
+            auto inner_sq = arena.alloc<BinaryOpNode>('^', operand, arena.alloc<NumberNode>(2.0));
+            auto radicand = arena.alloc<BinaryOpNode>('+', inner_sq, one);
+            auto sqrt = arena.alloc<UnaryOpNode>("sqrt", radicand);
+            auto denom = arena.alloc<BinaryOpNode>('*', operand, sqrt);
+            auto neg = arena.alloc<UnaryOpNode>("u-", arena.alloc<BinaryOpNode>('/', d_inner, denom));
+            return neg;
         }
         
         return arena.alloc<NumberNode>(0.0);
@@ -347,6 +546,20 @@ EngineResult AlgebraicParser::ParseAndExecute(const std::string& input) {
 }
 
 EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, double>& context) {
+    // Check cache first for performance
+    std::string cache_key = input;
+    for (const auto& [key, val] : context) {
+        cache_key += "_" + key + "=" + std::to_string(val);
+    }
+    if (eval_cache_.size() < MAX_CACHE_SIZE) {
+        auto cache_it = eval_cache_.find(cache_key);
+        if (cache_it != eval_cache_.end() && cache_it->second.value.has_value()) {
+            return {EngineSuccessResult(*cache_it->second.value), {}};
+        } else if (cache_it != eval_cache_.end()) {
+            return {{}, {EngineErrorResult(cache_it->second.error)}};
+        }
+    }
+    
     arena_.reset();
     std::string processed_input = input; 
     std::stringstream ss(processed_input);
@@ -355,16 +568,37 @@ EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& inpu
 
     for (const auto& entry : special_commands_) {
         if (first_token == entry.command) {
-            return entry.handler(processed_input);
+            auto result = entry.handler(processed_input);
+            // Cache the result (only cache double results for now to avoid complexity)
+            if (eval_cache_.size() < MAX_CACHE_SIZE) {
+                if (result.result.has_value() && std::holds_alternative<double>(*result.result)) {
+                    eval_cache_[cache_key] = EvalResult::Success(std::get<double>(*result.result));
+                } else if (result.error.has_value() && std::holds_alternative<CalcErr>(*result.error)) {
+                    eval_cache_[cache_key] = EvalResult::Failure(std::get<CalcErr>(*result.error));
+                }
+            }
+            return result;
         }
     }
 
     try {
         NodePtr root = ParseExpression(processed_input);
-        double result = root->Evaluate(context); 
-        return {EngineSuccessResult(result), {}};
-    } 
-    catch (const std::exception& e) {
+        auto evaluation = root->Evaluate(context);
+        if (evaluation.value.has_value()) {
+            // Cache successful evaluation
+            if (eval_cache_.size() < MAX_CACHE_SIZE) {
+                eval_cache_[cache_key] = evaluation;
+            }
+            return {EngineSuccessResult(*evaluation.value), {}};
+        }
+        CalcErr err = evaluation.error == CalcErr::None ? CalcErr::ArgumentMismatch : evaluation.error;
+        // Cache error
+        if (eval_cache_.size() < MAX_CACHE_SIZE) {
+            eval_cache_[cache_key] = evaluation;
+        }
+        return {{}, {EngineErrorResult(err)}};
+    }
+    catch (const std::exception&) {
         return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};
     }
 }
@@ -456,8 +690,11 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
     for (int iter = 0; iter < max_iter; ++iter) {
         std::vector<double> F(n);
         for(int i=0; i<n; ++i) {
-            try { F[i] = roots[i]->Evaluate(guess); } 
-            catch (...) { return {{}, EngineErrorResult(CalcErr::DomainError)}; }
+            auto eval = roots[i]->Evaluate(guess);
+            if (!eval.value.has_value()) {
+                return {{}, EngineErrorResult(NormalizeError(eval, CalcErr::DomainError))};
+            }
+            F[i] = *eval.value;
         }
         double err = 0; for(double v:F) err+=v*v;
         if(std::sqrt(err) < 1e-6) break;
@@ -466,7 +703,13 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
             std::string v = var_names[j];
             double old = guess[v];
             guess[v] += epsilon;
-            for (int i = 0; i < n; ++i) J[i][j] = (roots[i]->Evaluate(guess) - F[i]) / epsilon;
+            for (int i = 0; i < n; ++i) {
+                auto eval = roots[i]->Evaluate(guess);
+                if (!eval.value.has_value()) {
+                    return {{}, EngineErrorResult(NormalizeError(eval, CalcErr::DomainError))};
+                }
+                J[i][j] = (*eval.value - F[i]) / epsilon;
+            }
             guess[v] = old;
         }
         std::vector<double> neg_F = F;

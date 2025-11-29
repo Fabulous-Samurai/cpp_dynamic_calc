@@ -1,94 +1,309 @@
-# C++ Dynamic Thread-Safe Calculation Engine
+# C++ Dynamic Calculation Engine (Ogulator)
 
-> **Not just a calculator; an architectural journey from procedural roots to a modern, multi-paradigm calculation engine.**
+> **A comprehensive mathematical computing platform combining high-performance parsing, scientific computation, and intuitive TUI interaction.**
 
 ![C++ Standard](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
+![Version](https://img.shields.io/badge/Version-2.5.0-brightgreen.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Build](https://img.shields.io/badge/Build-CMake%20%2B%20Ninja-orange.svg)
 
-This project isn't just about doing math—it's a testament to **Modern C++ (C++20)** architecture. It documents the transformation of a rigid, procedural codebase into a flexible, thread-safe system, leveraging advanced patterns like **Strategy**, **Dependency Injection**, and **Data-Oriented Design**.
-
----
-
-## 🚀 The Architectural Evolution
-
-This engine wasn't built in a day; it was forged through four distinct evolutionary phases, each tackling a specific software engineering nightmare:
-
-### Phase I: Breaking the Monolith (OCP & Dynamic Dispatch)
-* **The Obstacle:** The classic "Switch-Case Hell." Adding a new operator meant modifying the core loop, violating the Open/Closed Principle and inviting spaghetti code.
-* **The Breakthrough:** We moved to a **Dynamic Dispatch** system. Operators are no longer hardcoded logic but are treated as first-class citizens stored in `std::map<string, std::function>`.
-* **Result:** You can now register new binary or unary operations at **runtime** without recompiling a single line of the core engine.
-
-### Phase II: Teaching Logic to the Machine (Shunting-Yard)
-* **The Obstacle:** A simple calculator fails when faced with complexity like `3 + 5 * 2`. It lacks the context of "order of operations."
-* **The Breakthrough:** We integrated a custom **Shunting-Yard Algorithm**. The engine doesn't just calculate; it *parses*. It tokenizes input, respects mathematical precedence (PEMDAS), manages parentheses, and executes logic using a **Reverse Polish Notation (RPN)** stack machine.
-
-### Phase III: Taming Concurrency (Thread-Safety & SOLID)
-* **The Obstacle:** As capabilities grew, the engine became a fragile monolith—unsafe for concurrent requests and hard to test.
-* **The Breakthrough:**
-    * **Bulletproof Concurrency:** Adopted a **Readers-Writer Lock** model using `std::shared_mutex`. Multiple threads can calculate simultaneously, while registration remains exclusive.
-    * **Deterministic Errors:** Goodbye, `try-catch`. We replaced costly exceptions with `std::variant` and `std::optional` for zero-overhead, type-safe error handling.
-    * **Strategy Pattern:** The code was decoupled into specialized strategies (`AlgebraicParser` vs. `LinearSystemParser`) orchestrated by a central Context (`CalcEngine`).
-
-### Phase IV: The Scientific Quantum Leap
-* **The Obstacle:** Basic arithmetic wasn't enough. We needed a tool for scientific analysis and system solving.
-* **The Breakthrough:**
-    * **Advanced Math:** Full support for Trigonometric, Inverse Trigonometric, Hyperbolic, and Logarithmic functions.
-    * **Linear Algebra:** A powerful **Gauss-Jordan Elimination** solver that parses natural language equations (e.g., `2x + y = 5`) and solves for $N$ variables instantly.
+Ogulator is not just a calculator—it's a **multi-paradigm mathematical computation engine** that demonstrates advanced C++20 architecture patterns. From procedural arithmetic to sophisticated scientific analysis, this project showcases the evolution of modern C++ design principles including **Strategy Pattern**, **Arena Memory Management**, **Exception-Free Error Handling**, and **Type-Safe Concurrency**.
 
 ---
 
-## 🛠️ Capabilities under the Hood
+## 🎯 Key Features
 
-### 🧮 Algebraic Engine
-* **Core:** `+`, `-`, `*`, `/`, `^`, `%`
-* **Functions:** `sqrt`, `abs`, `exp`
-* **Trigonometry:** `sin`, `cos`, `tan`, `cot`, `sec`, `csc` (Degrees)
-* **Transcendental:** `log` (base 10), `ln` (base e), `lg` (base 2), plus inverse trig functions.
+### 🧮 **Multi-Mode Computation Engine**
+- **Algebraic Mode:** Advanced expression parsing with AST-based evaluation
+- **Linear System Mode:** Matrix operations and equation solving
+- **Statistics Mode:** Comprehensive statistical analysis and hypothesis testing
+- **Unit Conversion Mode:** Dimensional analysis with 20+ unit types
+- **Plotting Mode:** ASCII-based function visualization
+- **Symbolic Mode:** Computer algebra foundations (expandable)
 
-### 📐 Linear Algebra Engine
-* **Natural Parsing:** Understands equations as strings: `"2x + 3y = 10; x - y = 5"`
-* **Solver:** Optimized matrix algorithms for N-variable systems.
+### ⚡ **Performance & Architecture**
+- **Arena Memory Management:** Custom 64KB block allocator for AST nodes
+- **Expression Memoization:** Intelligent caching with context-aware invalidation
+- **SafeMath Operations:** Overflow-protected arithmetic with `std::from_chars`
+- **Exception-Free Design:** `EvalResult<T>` pattern with `std::optional` and error enums
+- **Thread-Safe Evaluation:** Concurrent expression processing
 
-### ⚙️ System Architecture
-* **Zero-Overhead:** Heavy reliance on C++17/20 features (`std::variant`, `std::optional`) to avoid exception overhead.
-* **Hot-Swapping:** Switch parsing strategies (Algebraic <-> Linear) on the fly without restarting the engine.
+### 🎨 **Modern TUI Interface (FTXUI)**
+- **Interactive Terminal UI:** Real-time input with syntax highlighting
+- **Command History:** Navigate previous calculations with arrow keys
+- **Mode Switching:** Seamless transitions between calculation domains
+- **Scrollable Output:** Full-featured log with color-coded results
 
 ---
 
-## 💻 Code in Action
+## 🏗️ Architectural Evolution
 
+### Phase I: Foundation (Exception-Free Error Handling)
+**Problem:** Traditional exception-based error handling created performance overhead and unpredictable control flow.
+
+**Solution:** Implemented `EvalResult<T>` wrapper using `std::optional` and `CalcErr` enum for deterministic, zero-overhead error propagation.
+
+### Phase II: Performance Optimization (Arena + Memoization)
+**Problem:** Frequent AST node allocation caused memory fragmentation and cache misses.
+
+**Solution:** Custom Arena allocator with 64KB blocks and expression memoization cache for repeated evaluations.
+
+### Phase III: Domain Expansion (Strategy Pattern)
+**Problem:** Monolithic parser couldn't handle diverse mathematical domains.
+
+**Solution:** Decoupled parsing strategies (`AlgebraicParser`, `LinearSystemParser`, etc.) with unified `IParser` interface.
+
+### Phase IV: Scientific Computing (Specialized Engines)
+**Problem:** Advanced mathematical operations required domain-specific expertise.
+
+**Solution:** Dedicated engines for statistics, units, plotting, and symbolic computation with consistent `EngineResult` patterns.
+
+---
+
+## 🔧 Computation Capabilities
+
+### 🧮 **Algebraic Engine**
 ```cpp
-#include <iostream>
-#include "calc_engine.h"
+// Basic Operations
+3 + 5 * 2^3 - sqrt(16)
 
-int main() {
-    CalcEngine engine;
+// Advanced Functions
+sin(45) + cos(30) + tan(60)
+log(100) + ln(e) + exp(2)
+abs(-5) + max(3,7) + min(2,9)
 
-    // 1. Algebraic Mode: Handling complexity and precedence
-    auto result = engine.Evaluate("3 + 5 * ( sin 90 - 1 )");
-    // Output: Result: 3
+// With Variables (Ans)
+5 * 3          // → 15
+Ans + 10       // → 25 (uses previous result)
+```
 
-    // 2. Linear System Mode: Solving equations
-    engine.SetMode(CalcMode::LinearSystem);
-    auto sys_result = engine.Evaluate("2x + y = 5; x - y = 1");
-    // Output: Result: [ 2, 1 ]  (where x=2, y=1)
-    
-    return 0;
-}
+### 📊 **Statistics Engine**
+```cpp
+// Descriptive Statistics
+data = [1,2,3,4,5,6,7,8,9,10]
+mean(data)     // → 5.5
+median(data)   // → 5.5
+std_dev(data)  // → 3.03
 
-🏗️ Build & Run
+// Hypothesis Testing
+t_test(sample1, sample2)      // Two-sample t-test
+chi_squared_test(obs, exp)    // Chi-squared test
+correlation(x_data, y_data)   // Pearson correlation
+```
 
-This project uses CMake for cross-platform compatibility.
-Bash
+### 🔄 **Unit Conversion Engine**
+```cpp
+// Length Conversions
+convert(100, "cm", "m")     // → 1.0
+convert(5, "ft", "in")      // → 60.0
 
-# 1. Create build directory
-mkdir build && cd build
+// Temperature Conversions
+convert(100, "C", "F")      // → 212.0
+convert(273.15, "K", "C")   // → 0.0
 
-# 2. Configure and build
-cmake ..
-make
+// Complex Units
+convert(60, "mph", "m/s")    // → 26.82
+```
 
-# 3. Run
-./DynamicCalc
+### 📐 **Linear System Solver**
+```cpp
+// Natural Language Input
+"2x + 3y = 10; x - y = 1"
+// → Solution: x = 2.6, y = 1.6
 
-Built with precision, designed for scalability. A showcase of Modern C++ discipline.
+// Matrix Operations
+"x + 2y + z = 6; 2x - y + 3z = 14; 3x + y - z = -2"
+// → Solution: x = 1, y = 2, z = 1
+```
+
+### 📈 **Plotting Engine**
+```cpp
+// Function Plotting
+plot("sin(x)", -10, 10)     // ASCII sine wave
+plot("x^2", -5, 5)          // Parabola visualization
+plot("log(x)", 0.1, 10)     // Logarithmic curve
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **C++20** compatible compiler (GCC 10+, Clang 12+, MSVC 2019+)
+- **CMake 3.11+**
+- **Ninja** (recommended) or Make
+- **Git** for submodule management
+
+### Build Instructions
+
+#### Windows (MSYS2/MinGW)
+```bash
+# Clone with submodules
+git clone --recursive https://github.com/yourusername/cpp_dynamic_calc.git
+cd cpp_dynamic_calc
+
+# Configure and build
+cmake -S . -B build -G "Ninja"
+cmake --build build --parallel
+
+# Run
+.\build\cpp_dynamic_calc.exe
+```
+
+#### Linux/macOS
+```bash
+# Clone with submodules
+git clone --recursive https://github.com/yourusername/cpp_dynamic_calc.git
+cd cpp_dynamic_calc
+
+# Configure and build
+cmake -S . -B build
+cmake --build build -j$(nproc)
+
+# Run
+./build/cpp_dynamic_calc
+```
+
+### Development Build
+```bash
+# Debug build with testing
+cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build cmake-build-debug
+
+# Run tests
+./cmake-build-debug/run_tests
+```
+
+---
+
+## 🎮 Usage Guide
+
+### Interactive Commands
+```bash
+# Mode Switching
+mode algebraic    # Switch to algebraic calculator
+mode linear      # Switch to linear system solver
+mode stats       # Switch to statistics mode
+mode units       # Switch to unit conversion
+mode plot        # Switch to plotting mode
+
+# Utility Commands
+help            # Show command reference
+clear           # Clear screen
+exit            # Close application
+history         # Show calculation history
+```
+
+### Example Session
+```
+Ogulator v2.5.0 - Multi-Modal Calculation Engine
+> mode algebraic
+Switched to Algebraic mode
+
+> 3 + 5 * 2^3
+Result: 43
+
+> sin(90) + cos(0)
+Result: 2
+
+> mode stats
+Switched to Statistics mode
+
+> mean([1,2,3,4,5])
+Result: 3
+
+> mode units
+Switched to Units mode
+
+> convert(100, "cm", "m")
+Result: 1 m
+```
+
+---
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+# Run all tests
+./build/run_tests
+
+# AST-specific tests
+./build/ast_drills
+```
+
+### Manual Testing
+```bash
+# Performance benchmarking
+time echo "sin(45) * cos(30) + tan(60)" | ./build/cpp_dynamic_calc
+
+# Memory usage analysis
+valgrind --tool=memcheck ./build/cpp_dynamic_calc
+```
+
+---
+
+## 🔬 Technical Deep Dive
+
+### Memory Management
+- **Arena Allocator:** 64KB block-based allocation for AST nodes
+- **RAII Patterns:** Automatic cleanup with smart pointers
+- **Cache-Friendly:** Contiguous memory layout for better performance
+
+### Error Handling
+- **Type-Safe Errors:** `CalcErr` enum instead of exceptions
+- **Monadic Composition:** `EvalResult<T>` supports chaining operations
+- **Context Preservation:** Error messages include expression context
+
+### Parser Architecture
+- **Shunting-Yard Algorithm:** Proper operator precedence handling
+- **Recursive Descent:** Support for nested function calls
+- **Token Streaming:** Efficient string-to-AST conversion
+
+---
+
+## 🔄 Version History
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+**Current Version: 2.5.0**
+- ✅ Complete statistics engine with hypothesis testing
+- ✅ Comprehensive unit conversion system (20+ unit types)
+- ✅ ASCII function plotting capabilities
+- ✅ Performance optimizations (arena allocation + memoization)
+- ✅ Enhanced TUI with mode switching
+
+---
+
+## 🤝 Contributing
+
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+3. **Commit** changes: `git commit -m 'Add amazing feature'`
+4. **Push** to branch: `git push origin feature/amazing-feature`
+5. **Open** a Pull Request
+
+### Development Guidelines
+- Follow **C++20** best practices
+- Maintain **exception-free** design patterns
+- Add **unit tests** for new features
+- Update **documentation** for API changes
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **FTXUI Library:** Modern terminal UI framework
+- **C++20 Standards:** Concepts, ranges, and improved constexpr support
+- **Mathematical Algorithms:** Numerical Recipes and NIST Statistical Handbook
+- **Community:** C++ Core Guidelines and Modern C++ practices
+
+---
+
+*Built with precision, designed for extensibility, optimized for performance.*

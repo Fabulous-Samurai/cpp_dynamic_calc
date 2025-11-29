@@ -5,6 +5,8 @@
 #include <variant>
 #include <functional>
 #include <string>
+#include <cmath>
+#include <limits>
 
 enum class CalcErr
 {
@@ -15,7 +17,12 @@ enum class CalcErr
     ArgumentMismatch,
     NegativeRoot,
     DomainError,
-    ParseError
+    ParseError,
+    // New stability errors
+    NumericOverflow,
+    StackOverflow,
+    MemoryExhausted,
+    InfiniteLoop
 };
 
 enum class LinAlgErr
@@ -40,6 +47,31 @@ struct EngineResult
 const double PI_CONST = 3.14159265358979323846;
 const double D2R = PI_CONST / 180.0;
 const double R2D = 180.0 / PI_CONST;
+
+#include <cmath>
+
+// Safe arithmetic operations
+namespace SafeMath {
+    constexpr double MAX_SAFE_DOUBLE = 1e100;
+    constexpr double MIN_SAFE_DOUBLE = -1e100;
+    
+    inline bool IsFiniteAndSafe(double val) {
+        return std::isfinite(val) && val <= MAX_SAFE_DOUBLE && val >= MIN_SAFE_DOUBLE;
+    }
+    
+    inline std::optional<double> SafeAdd(double a, double b) {
+        if (!IsFiniteAndSafe(a) || !IsFiniteAndSafe(b)) return std::nullopt;
+        double result = a + b;
+        return IsFiniteAndSafe(result) ? std::optional<double>(result) : std::nullopt;
+    }
+    
+    inline std::optional<double> SafePow(double base, double exp) {
+        if (!IsFiniteAndSafe(base) || !IsFiniteAndSafe(exp)) return std::nullopt;
+        if (std::abs(exp) > 100 || std::abs(base) > 1e10) return std::nullopt; // Prevent huge exponents
+        double result = std::pow(base, exp);
+        return IsFiniteAndSafe(result) ? std::optional<double>(result) : std::nullopt;
+    }
+}
 
 enum class Precedence : int
 {

@@ -1,55 +1,48 @@
 #pragma once
+
 #include <string>
-#include <string_view>
-#include <charconv>
 #include <vector>
 #include <sstream>
-#include <algorithm>
 #include <cctype>
+#include <algorithm>
+#include <charconv>
+#include <optional>
+#include <string_view>
 
 namespace Utils {
+    
+    // Fast string-to-double conversion using std::from_chars (C++17)
+    inline std::optional<double> FastParseDouble(std::string_view sv) {
+        if (sv.empty()) return std::nullopt;
+        
+        // Handle edge cases that std::from_chars might not handle well
+        std::string str(sv);
+        
+        // Handle leading decimal point (e.g., ".5" -> "0.5")
+        if (str.front() == '.') {
+            str = "0" + str;
+        }
+        // Handle trailing decimal point (e.g., "5." -> "5.0")
+        else if (str.back() == '.') {
+            str += "0";
+        }
+        
+        double result;
+        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+        // Check if conversion was successful AND we consumed the entire string
+        return (ec == std::errc{} && ptr == str.data() + str.size()) ? std::optional<double>(result) : std::nullopt;
+    }
 
     // Helper to trim strings (removes whitespace from both ends)
-    inline std::string Trim(const std::string& str) {
-        size_t first = str.find_first_not_of(" \t\n\r");
-        if (std::string::npos == first) return "";
-        size_t last = str.find_last_not_of(" \t\n\r");
-        return str.substr(first, (last - first + 1));
-    }
+    std::string Trim(const std::string& str);
     
     // Helper to split string by delimiter
-    inline std::vector<std::string> Split(const std::string& s, char delimiter) {
-        std::vector<std::string> tokens;
-        std::string token;
-        std::istringstream tokenStream(s);
-        while (std::getline(tokenStream, token, delimiter)) {
-            // Split ederken otomatik Trim yapıyoruz ki " x " gibi durumlar oluşmasın
-            std::string trimmed = Trim(token);
-            if(!trimmed.empty()) {
-                tokens.push_back(trimmed);
-            }
-        }
-        return tokens;
-    }
+    std::vector<std::string> Split(const std::string& s, char delimiter);
 
-    // Modern C++ Way: Exception-free number check.
+    // Modern C++ Way: Exception-free number check with fast parsing
     inline bool IsNumber(std::string_view str) {
         if (str.empty()) return false;
-
-        // Trim temporary view for check
-        size_t first = str.find_first_not_of(' ');
-        if (std::string_view::npos == first) return false;
-        str.remove_prefix(first);
-        size_t last = str.find_last_not_of(' ');
-        if (std::string_view::npos != last) str = str.substr(0, last + 1);
-
-        if (str.empty()) return false;
-        
-        const char* first_ptr = str.data();
-        const char* last_ptr = str.data() + str.size();
-        double result;
-        auto [ptr, ec] = std::from_chars(first_ptr, last_ptr, result);
-        return (ec == std::errc()) && (ptr == last_ptr);
+        return FastParseDouble(str).has_value();
     }
     
     // Helper for ReplaceAns logic (Moved from main.cpp)
@@ -69,4 +62,7 @@ namespace Utils {
         }
         return input;
     }
+
+    // String utilities
+    std::string ReplaceAll(const std::string& str, const std::string& from, const std::string& to);
 }

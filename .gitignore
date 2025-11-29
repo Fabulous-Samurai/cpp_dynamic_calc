@@ -2,6 +2,7 @@ build/
 out/
 bin/
 lib/
+cmake-build-debug/
 documents/
 *.exe
 *.dll

@@ -29,6 +29,12 @@ add_executable(cpp_dynamic_calc
         src/dynamic_calc.cpp
         src/algebraic_parser.cpp
         src/linear_system_parser.cpp
+        src/string_helpers.cpp
+        src/unit_manager.cpp
+        src/unit_parser.cpp
+        src/statistics_engine.cpp
+        src/symbolic_engine.cpp
+        src/plot_engine.cpp
         
         include/dynamic_calc.h
         include/dynamic_calc_types.h
@@ -36,6 +42,11 @@ add_executable(cpp_dynamic_calc
         include/algebraic_parser.h
         include/linear_system_parser.h
         include/string_helpers.h
+        include/unit_manager.h
+        include/unit_parser.h
+        include/statistics_engine.h
+        include/symbolic_engine.h
+        include/plot_engine.h
 )
 
 target_link_libraries(cpp_dynamic_calc 
@@ -52,8 +63,20 @@ add_executable(run_tests
         src/dynamic_calc.cpp
         src/algebraic_parser.cpp
         src/linear_system_parser.cpp
+        src/string_helpers.cpp
+        src/unit_manager.cpp
+        src/unit_parser.cpp
+        src/statistics_engine.cpp
+        src/symbolic_engine.cpp
+        src/plot_engine.cpp
+        
         include/dynamic_calc.h
         include/string_helpers.h
+        include/unit_manager.h
+        include/unit_parser.h
+        include/statistics_engine.h
+        include/symbolic_engine.h
+        include/plot_engine.h
 )
 
 target_link_libraries(run_tests 

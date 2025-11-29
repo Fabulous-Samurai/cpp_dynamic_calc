@@ -4,6 +4,9 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <immintrin.h>  // SIMD support
+#include <unordered_map>
+#include <memory_resource>  // PMR allocators
 
 struct LinAlgResult {
     std::optional<std::vector<double>> solution;
