@@ -14,7 +14,8 @@ enum class CalcErr
     OperationNotFound,
     ArgumentMismatch,
     NegativeRoot,
-    DomainError
+    DomainError,
+    ParseError
 };
 
 enum class LinAlgErr
@@ -27,7 +28,7 @@ enum class LinAlgErr
 };
 using Matrix = std::vector<std::vector<double>>;
 using Vector = std::vector<double>;
-using EngineSuccessResult = std::variant<double, Vector, Matrix>;
+using EngineSuccessResult = std::variant<double, Vector, Matrix,std::string>;
 using EngineErrorResult = std::variant<CalcErr, LinAlgErr>;
 
 struct EngineResult

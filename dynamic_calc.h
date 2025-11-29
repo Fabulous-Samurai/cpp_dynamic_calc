@@ -22,5 +22,7 @@ public:
     void SetMode(CalcMode mode);
     EngineResult Evaluate(const std::string& input);
 
-    void RegisterAlgebraicOperator(const std::string& op, const OperatorDetails& details);
+    EngineResult EvaluateWithContext(const std::string& input , const std::map<std::string,double>&context);
+
+   
 };

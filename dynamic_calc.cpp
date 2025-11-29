@@ -23,27 +23,19 @@ void CalcEngine::SetMode(CalcMode mode) {
 // @param input: The input string to evaluate.
 // @return: The result of the evaluation as an EngineResult.
 EngineResult CalcEngine::Evaluate(const std::string &input) {
-    auto it = parsers_.find(current_mode_);
-    if (it == parsers_.end()) {
-        // If the current mode is not found, return an error.
-        return {{}, {EngineErrorResult(CalcErr::OperationNotFound)}};
-    }
-
-    // Delegate parsing and execution to the appropriate parser.
-    return it->second->ParseAndExecute(input);
+   return EvaluateWithContext(input,{});
 }
 
-// Registers a custom operator for the algebraic parser.
-// @param op: The operator string (e.g., "+", "*").
-// @param details: The details of the operator, including its implementation and precedence.
-void CalcEngine::RegisterAlgebraicOperator(const std::string &op, const OperatorDetails &details) {
-    auto it = parsers_.find(CalcMode::Algebraic);
-    if (it != parsers_.end()) {
-        // Cast the parser to AlgebraicParser and register the operator.
-        AlgebraicParser *alg_parser = static_cast<AlgebraicParser *>(it->second.get());
-        alg_parser->RegisterOperator(op, details);
-    } else {
-        // Throw an exception if the algebraic parser is not initialized.
-        throw std::runtime_error("Algebraic parser not initialized.");
+EngineResult CalcEngine::EvaluateWithContext(const std::string& input,const std::map<std::string,double>& context){
+    auto it = parsers_.find(current_mode_);
+    if(it == parsers_.end()){
+        return {{},{EngineErrorResult(CalcErr::OperationNotFound)}};
     }
+
+    if(current_mode_== CalcMode::Algebraic){
+        AlgebraicParser* alg_parser = static_cast<AlgebraicParser*>(it->second.get());
+        return alg_parser->ParseAndExecuteWithContext(input,context);
+    }
+    
+    return it->second->ParseAndExecute(input);
 }

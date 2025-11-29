@@ -1,4 +1,6 @@
 C:/cpp_dynamic_calc/build/CMakeFiles/cpp_dynamic_calc.dir
+C:/cpp_dynamic_calc/build/CMakeFiles/run_tests.dir
+C:/cpp_dynamic_calc/build/CMakeFiles/ast_drills.dir
 C:/cpp_dynamic_calc/build/CMakeFiles/package.dir
 C:/cpp_dynamic_calc/build/CMakeFiles/package_source.dir
 C:/cpp_dynamic_calc/build/CMakeFiles/edit_cache.dir

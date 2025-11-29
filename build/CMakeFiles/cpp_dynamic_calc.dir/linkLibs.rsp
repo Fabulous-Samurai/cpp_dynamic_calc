@@ -1,1 +1,0 @@
- "libs/FTXUI/libftxui-screen.a" "libs/FTXUI/libftxui-dom.a" "libs/FTXUI/libftxui-component.a" "libs/FTXUI/libftxui-dom.a" "libs/FTXUI/libftxui-screen.a" -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 

@@ -1,406 +1,454 @@
-#include "algebraic_parser.h"
-#include <stdexcept>
-#include <sstream>
-#include <cmath>
-#include <stack>
-#include <iostream>
-#include <limits>
+/**
+ * @file algebraic_parser.cpp
+ * @brief Implementation of the Algebraic Parser using AST.
+ * FIX: Final correction for 'my_prec' variable name typo in ToString.
+ */
 
-#define MAKE_ERROR(error_code) {{}, EngineErrorResult(error_code)}
-#define MAKE_SUCCESS(value)            \
-    {                                  \
-        EngineSuccessResult(value), {} \
+#include "algebraic_parser.h"
+#include "string_helpers.h"
+#include <iostream>
+#include <cmath>
+#include <sstream>
+#include <algorithm>
+#include <set>
+
+// --- Helpers ---
+
+// Returns Precedence Enum (matches header)
+Precedence GetOpPrecedence(char op) {
+    if (op == '+' || op == '-') return Precedence::AddSub;   // Level 1
+    if (op == '*' || op == '/') return Precedence::MultiDiv; // Level 2
+    if (op == '^') return Precedence::Pow;                   // Level 3
+    return Precedence::None; // Level 0
+}
+
+bool IsConst(const NodePtr node, double val) {
+    try { return std::abs(node->Evaluate({}) - val) < 1e-9; } catch (...) { return false; }
+}
+
+std::string FormatNumber(double val) {
+    std::string s = std::to_string(val);
+    s.erase(s.find_last_not_of('0') + 1, std::string::npos);
+    if (s.back() == '.') s.pop_back();
+    return s;
+}
+
+// ========================================================
+// AST NODE IMPLEMENTATIONS
+// ========================================================
+
+struct NumberNode : ExprNode {
+    double value;
+    NumberNode(double v) : value(v) {}
+    
+    double Evaluate(const std::map<std::string, double>&) const override { return value; }
+    NodePtr Derivative(Arena& arena, std::string_view) const override { return arena.alloc<NumberNode>(0.0); }
+    NodePtr Simplify(Arena& arena) const override { return arena.alloc<NumberNode>(value); }
+    
+    std::string ToString(Precedence) const override { return FormatNumber(value); }
+};
+
+struct VariableNode : ExprNode {
+    std::string_view name;
+    VariableNode(std::string_view n) : name(n) {}
+    
+    double Evaluate(const std::map<std::string, double>& vars) const override {
+        std::string key(name);
+        if (vars.count(key)) return vars.at(key);
+        if (key == "Ans") return 0.0;
+        throw std::runtime_error("Undefined variable: " + key);
+    }
+    NodePtr Derivative(Arena& arena, std::string_view var) const override {
+        if (name == var) return arena.alloc<NumberNode>(1.0);
+        return arena.alloc<NumberNode>(0.0);
+    }
+    NodePtr Simplify(Arena& arena) const override { return arena.alloc<VariableNode>(name); }
+    
+    std::string ToString(Precedence) const override { return std::string(name); }
+};
+
+struct BinaryOpNode : ExprNode {
+    char op; NodePtr left, right;
+    BinaryOpNode(char c, NodePtr l, NodePtr r) : op(c), left(l), right(r) {}
+    
+    double Evaluate(const std::map<std::string, double>& vars) const override {
+        double l = left->Evaluate(vars);
+        double r = right->Evaluate(vars);
+        switch(op) {
+            case '+': return l + r;
+            case '-': return l - r;
+            case '*': return l * r;
+            case '/': return (r != 0.0) ? l / r : throw std::runtime_error("Division by zero");
+            case '^': return std::pow(l, r);
+            default: return 0.0;
+        }
+    }
+    
+    NodePtr Derivative(Arena& arena, std::string_view var) const override {
+        auto dl = left->Derivative(arena, var);
+        auto dr = right->Derivative(arena, var);
+        
+        if (op == '+' || op == '-') return arena.alloc<BinaryOpNode>(op, dl, dr);
+        if (op == '*') {
+            auto t1 = arena.alloc<BinaryOpNode>('*', dl, right);
+            auto t2 = arena.alloc<BinaryOpNode>('*', left, dr);
+            return arena.alloc<BinaryOpNode>('+', t1, t2);
+        }
+        if (op == '^') {
+            auto n_minus_1 = arena.alloc<BinaryOpNode>('-', right, arena.alloc<NumberNode>(1.0));
+            auto u_pow = arena.alloc<BinaryOpNode>('^', left, n_minus_1);
+            auto n_times_u = arena.alloc<BinaryOpNode>('*', right, u_pow);
+            return arena.alloc<BinaryOpNode>('*', n_times_u, dl);
+        }
+        return arena.alloc<NumberNode>(0.0); 
     }
 
-AlgebraicParser::AlgebraicParser()
-{
-    std::lock_guard<std::shared_mutex> lock(mutex_s);
+    NodePtr Simplify(Arena& arena) const override {
+        auto simple_left = left->Simplify(arena);
+        auto simple_right = right->Simplify(arena);
 
-    ops_["+"] = {[](const std::vector<double> &args) -> EngineResult
-                 { if (args.size() != 2) return MAKE_ERROR(CalcErr::ArgumentMismatch); return MAKE_SUCCESS(args[0] + args[1]); }, Precedence::AddSub};
-    ops_["-"] = {[](const std::vector<double> &args) -> EngineResult
-                 { if (args.size() != 2) return MAKE_ERROR(CalcErr::ArgumentMismatch); return MAKE_SUCCESS(args[0] - args[1]); }, Precedence::AddSub};
-    ops_["*"] = {[](const std::vector<double> &args) -> EngineResult
-                 { if (args.size() != 2) return MAKE_ERROR(CalcErr::ArgumentMismatch); return MAKE_SUCCESS(args[0] * args[1]); }, Precedence::MultiDiv};
-    ops_["/"] = {[](const std::vector<double> &args) -> EngineResult
-                 { if (args.size() != 2) return MAKE_ERROR(CalcErr::ArgumentMismatch); if (args[1] == 0) return MAKE_ERROR(CalcErr::DivideByZero); return MAKE_SUCCESS(args[0] / args[1]); }, Precedence::MultiDiv};
-    ops_["^"] = {[](const std::vector<double> &args) -> EngineResult
-                 { if (args.size() != 2) return MAKE_ERROR(CalcErr::ArgumentMismatch); return MAKE_SUCCESS(std::pow(args[0], args[1])); }, Precedence::Pow};
+        bool l_const = false, r_const = false;
+        double l_val = 0, r_val = 0;
+        try { l_val = simple_left->Evaluate({}); l_const = true; } catch(...) {}
+        try { r_val = simple_right->Evaluate({}); r_const = true; } catch(...) {}
 
-    unary_ops_["sqrt"] = {[](const std::vector<double> &args) -> EngineResult { if(args[0]<0) return MAKE_ERROR(CalcErr::NegativeRoot); return MAKE_SUCCESS(std::sqrt(args[0])); }};
-    unary_ops_["abs"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::abs(args[0])); }};
-    unary_ops_["log"] = {[](const std::vector<double> &args) -> EngineResult { if(args[0]<=0) return MAKE_ERROR(CalcErr::DomainError); return MAKE_SUCCESS(std::log10(args[0])); }};
-    unary_ops_["ln"] = {[](const std::vector<double> &args) -> EngineResult { if(args[0]<=0) return MAKE_ERROR(CalcErr::DomainError); return MAKE_SUCCESS(std::log(args[0])); }};
-    unary_ops_["log2"] = {[](const std::vector<double> &args) -> EngineResult { if (args[0] <= 0) return MAKE_ERROR(CalcErr::DomainError); return MAKE_SUCCESS(std::log2(args[0])); }};
-    unary_ops_["lg"] = unary_ops_["log2"];
+        if (l_const && r_const) {
+            if (op == '+') return arena.alloc<NumberNode>(l_val + r_val);
+            if (op == '-') return arena.alloc<NumberNode>(l_val - r_val);
+            if (op == '*') return arena.alloc<NumberNode>(l_val * r_val);
+        }
 
-    unary_ops_["sin"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::sin(args[0] * D2R)); }};
-    unary_ops_["cos"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::cos(args[0] * D2R)); }};
-    unary_ops_["tan"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::tan(args[0] * D2R)); }};
+        if (op == '+') {
+            if (IsConst(simple_right, 0.0)) return simple_left;
+            if (IsConst(simple_left, 0.0)) return simple_right;
+            if (simple_left->ToString(Precedence::None) == simple_right->ToString(Precedence::None)) 
+                return arena.alloc<BinaryOpNode>('*', arena.alloc<NumberNode>(2.0), simple_left);
+        }
+        else if (op == '*') {
+            if (IsConst(simple_right, 0.0) || IsConst(simple_left, 0.0)) return arena.alloc<NumberNode>(0.0);
+            if (IsConst(simple_right, 1.0)) return simple_left;
+            if (IsConst(simple_left, 1.0)) return simple_right;
+        }
+        else if (op == '^') {
+            if (IsConst(simple_right, 1.0)) return simple_left;
+            if (IsConst(simple_right, 0.0)) return arena.alloc<NumberNode>(1.0);
+        }
+
+        return arena.alloc<BinaryOpNode>(op, simple_left, simple_right);
+    }
+
+    // [CORRECTED] Use 'my_prec' consistently
+    std::string ToString(Precedence parent_prec) const override {
+        Precedence my_prec = GetOpPrecedence(op);
+        
+        // Corrected line: passing 'my_prec' to both children
+        std::string result = left->ToString(my_prec) + " " + op + " " + right->ToString(my_prec);
+        
+        if (static_cast<int>(my_prec) < static_cast<int>(parent_prec)) {
+            return "(" + result + ")";
+        }
+        return result;
+    }
+};
+
+struct UnaryOpNode : ExprNode {
+    std::string_view func; NodePtr operand;
+    UnaryOpNode(std::string_view f, NodePtr op) : func(f), operand(op) {}
     
-    unary_ops_["cot"] = {[](const std::vector<double> &args) -> EngineResult { 
-        double t = std::tan(args[0] * D2R); 
-        if (std::abs(t) < 1e-9) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(1.0 / t); 
-    }};
-    unary_ops_["sec"] = {[](const std::vector<double> &args) -> EngineResult { 
-        double c = std::cos(args[0] * D2R); 
-        if (std::abs(c) < 1e-9) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(1.0 / c); 
-    }};
-    unary_ops_["csc"] = {[](const std::vector<double> &args) -> EngineResult { 
-        double s = std::sin(args[0] * D2R); 
-        if (std::abs(s) < 1e-9) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(1.0 / s); 
-    }};
-
-    unary_ops_["asin"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (args[0] < -1.0 || args[0] > 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::asin(args[0]) * R2D); 
-    }};
-    unary_ops_["acos"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (args[0] < -1.0 || args[0] > 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::acos(args[0]) * R2D); 
-    }};
-    unary_ops_["atan"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::atan(args[0]) * R2D); }};
+    double Evaluate(const std::map<std::string, double>& vars) const override {
+        double val = operand->Evaluate(vars);
+        if (func == "sin") return std::sin(val * D2R);
+        if (func == "cos") return std::cos(val * D2R);
+        if (func == "tan") return std::tan(val * D2R);
+        if (func == "sqrt") return (val >= 0) ? std::sqrt(val) : throw std::runtime_error("Negative sqrt");
+        if (func == "log") return (val > 0) ? std::log10(val) : throw std::runtime_error("Log domain error");
+        if (func == "u-") return -val;
+        return 0.0;
+    }
     
-    unary_ops_["acot"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::atan(1.0 / args[0]) * R2D); }};
-    unary_ops_["asec"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (std::abs(args[0]) < 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::acos(1.0 / args[0]) * R2D); 
-    }};
-    unary_ops_["acsc"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (std::abs(args[0]) < 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::asin(1.0 / args[0]) * R2D); 
-    }};
+    NodePtr Derivative(Arena& arena, std::string_view var) const override {
+        auto d_inner = operand->Derivative(arena, var);
+        if (func == "u-") return arena.alloc<UnaryOpNode>("u-", d_inner);
+        if (func == "sin") {
+            auto cos_u = arena.alloc<UnaryOpNode>("cos", operand);
+            return arena.alloc<BinaryOpNode>('*', cos_u, d_inner);
+        }
+        if (func == "cos") {
+            auto sin_u = arena.alloc<UnaryOpNode>("sin", operand);
+            auto neg_sin = arena.alloc<UnaryOpNode>("u-", sin_u);
+            return arena.alloc<BinaryOpNode>('*', neg_sin, d_inner);
+        }
+        return arena.alloc<NumberNode>(0.0);
+    }
 
-    unary_ops_["sinh"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::sinh(args[0])); }};
-    unary_ops_["cosh"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::cosh(args[0])); }};
-    unary_ops_["tanh"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::tanh(args[0])); }};
-    
-    unary_ops_["coth"] = {[](const std::vector<double> &args) -> EngineResult { 
-        double t = std::tanh(args[0]); 
-        if (std::abs(t) < 1e-9) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(1.0 / t); 
-    }};
-    unary_ops_["sech"] = {[](const std::vector<double> &args) -> EngineResult { 
-        double c = std::cosh(args[0]); 
-        if (std::abs(c) < 1e-9) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(1.0 / c); 
-    }};
-    unary_ops_["csch"] = {[](const std::vector<double> &args) -> EngineResult { 
-        double s = std::sinh(args[0]); 
-        if (std::abs(s) < 1e-9) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(1.0 / s); 
-    }};
+    NodePtr Simplify(Arena& arena) const override {
+        auto simple_inner = operand->Simplify(arena);
+        return arena.alloc<UnaryOpNode>(func, simple_inner);
+    }
 
-    unary_ops_["asinh"] = {[](const std::vector<double> &args) -> EngineResult { return MAKE_SUCCESS(std::asinh(args[0])); }};
-    unary_ops_["acosh"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (args[0] < 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::acosh(args[0])); 
-    }};
-    unary_ops_["atanh"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (std::abs(args[0]) >= 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::atanh(args[0])); 
-    }};
-    unary_ops_["acoth"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (std::abs(args[0]) <= 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::atanh(1.0 / args[0])); 
-    }};
-    unary_ops_["asech"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (args[0] <= 0.0 || args[0] > 1.0) return MAKE_ERROR(CalcErr::DomainError); 
-        return MAKE_SUCCESS(std::acosh(1.0 / args[0])); 
-    }};
-    unary_ops_["acsch"] = {[](const std::vector<double> &args) -> EngineResult { 
-        if (args[0] == 0.0) return MAKE_ERROR(CalcErr::DivideByZero); 
-        return MAKE_SUCCESS(std::asinh(1.0 / args[0])); 
-    }};
+    std::string ToString(Precedence) const override {
+        if (func == "u-") return "-" + operand->ToString(Precedence::Unary);
+        return std::string(func) + "(" + operand->ToString(Precedence::None) + ")";
+    }
+};
 
-    RegisterSpecialCommands();
-}
+// ========================================================
+// ALGEBRAIC PARSER IMPLEMENTATION
+// ========================================================
+
+AlgebraicParser::AlgebraicParser() { RegisterSpecialCommands(); }
 
 void AlgebraicParser::RegisterSpecialCommands() {
     special_commands_.push_back({"quadratic", [this](const std::string& s){ return HandleQuadratic(s); }});
     special_commands_.push_back({"solve_nl", [this](const std::string& s){ return HandleNonLinearSolve(s); }});
+    special_commands_.push_back({"derive", [this](const std::string& s){ return HandleDerivative(s); }});
 }
 
-EngineResult AlgebraicParser::ParseAndExecute(const std::string &input) {
-    std::stringstream ss(input);
+NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
+    while (!input.empty() && std::isspace(static_cast<unsigned char>(input.front()))) input.remove_prefix(1);
+    while (!input.empty() && std::isspace(static_cast<unsigned char>(input.back()))) input.remove_suffix(1);
+
+    auto parse_binary = [&](std::string_view operators, bool right_to_left) -> NodePtr {
+        int bracket_depth = 0;
+        int start = right_to_left ? input.size() - 1 : 0;
+        int end = right_to_left ? -1 : input.size();
+        int step = right_to_left ? -1 : 1;
+
+        for (int i = start; i != end; i += step) {
+            char c = input[i];
+            if (c == ')') bracket_depth++;
+            else if (c == '(') bracket_depth--;
+            else if (bracket_depth == 0) {
+                if (operators.find(c) != std::string_view::npos) {
+                    return arena_.alloc<BinaryOpNode>(c, 
+                        ParseExpression(input.substr(0, i)), 
+                        ParseExpression(input.substr(i + 1)));
+                }
+            }
+        }
+        return nullptr;
+    };
+
+    if (auto node = parse_binary("+-", true)) return node;
+    if (auto node = parse_binary("*/", true)) return node;
+
+    // Implicit Multiplication
+    if (input.size() > 1) { 
+        int bracket_depth = 0;
+        for (size_t i = 0; i < input.size() - 1; ++i) {
+            char curr = input[i];
+            char next = input[i+1];
+            if (curr == '(') bracket_depth++;
+            if (curr == ')') bracket_depth--;
+            if (bracket_depth == 0) {
+                bool digit_alpha = std::isdigit(static_cast<unsigned char>(curr)) && std::isalpha(static_cast<unsigned char>(next));
+                bool digit_paren = std::isdigit(static_cast<unsigned char>(curr)) && next == '(';
+                bool paren_alpha = (curr == ')') && std::isalpha(static_cast<unsigned char>(next));
+                bool paren_paren = (curr == ')') && next == '(';
+                
+                if (digit_alpha || digit_paren || paren_alpha || paren_paren) {
+                    return arena_.alloc<BinaryOpNode>('*', 
+                            ParseExpression(input.substr(0, i + 1)), 
+                            ParseExpression(input.substr(i + 1)));
+                }
+            }
+        }
+    }
+
+    if (auto node = parse_binary("^", false)) return node;
+
+    if (input.size() >= 2 && input.front() == '(' && input.back() == ')') {
+        return ParseExpression(input.substr(1, input.size() - 2));
+    }
+
+    size_t paren_start = input.find('(');
+    if (paren_start != std::string_view::npos && input.back() == ')') {
+        auto func_name = input.substr(0, paren_start);
+        while(!func_name.empty() && std::isspace(static_cast<unsigned char>(func_name.back()))) func_name.remove_suffix(1);
+        auto inner = input.substr(paren_start + 1, input.size() - paren_start - 2);
+        return arena_.alloc<UnaryOpNode>(arena_.allocString(func_name), ParseExpression(inner));
+    }
+    
+    size_t space_pos = input.find(' ');
+    if (space_pos != std::string_view::npos) {
+        auto func_name = input.substr(0, space_pos);
+        auto arg = input.substr(space_pos + 1);
+        bool is_func = true;
+        for(char c : func_name) if(!std::isalpha(c)) is_func = false;
+        if (is_func && !func_name.empty()) {
+             return arena_.alloc<UnaryOpNode>(arena_.allocString(func_name), ParseExpression(arg));
+        }
+    }
+
+    if (Utils::IsNumber(input)) {
+        return arena_.alloc<NumberNode>(std::stod(std::string(input)));
+    } else {
+        if (input.empty()) return arena_.alloc<NumberNode>(0.0);
+        return arena_.alloc<VariableNode>(arena_.allocString(input));
+    }
+}
+
+EngineResult AlgebraicParser::ParseAndExecute(const std::string& input) {
+    return ParseAndExecuteWithContext(input, {}); 
+}
+
+EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, double>& context) {
+    arena_.reset();
+    std::string processed_input = input; 
+    std::stringstream ss(processed_input);
     std::string first_token;
     ss >> first_token;
 
     for (const auto& entry : special_commands_) {
         if (first_token == entry.command) {
-            return entry.handler(input);
+            return entry.handler(processed_input);
         }
     }
 
-    std::queue<std::string> rpn_queue = ParseToRPN(input);
-    return EvaluateRPN(rpn_queue);
+    try {
+        NodePtr root = ParseExpression(processed_input);
+        double result = root->Evaluate(context); 
+        return {EngineSuccessResult(result), {}};
+    } 
+    catch (const std::exception& e) {
+        return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};
+    }
 }
 
 EngineResult AlgebraicParser::HandleQuadratic(const std::string& input) {
     std::stringstream ss(input);
     std::string cmd;
     double a, b, c;
-    ss >> cmd >> a >> b >> c;
-    if (ss.fail()) return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};
+    ss >> cmd;
+    if (!(ss >> a >> b >> c)) return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};
     return SolveQuadratic(a, b, c);
 }
 
 EngineResult AlgebraicParser::HandleNonLinearSolve(const std::string& input) {
-    std::vector<std::string> eqns = {"x^2 + y^2 - 10", "x - y - 2"};
-    std::map<std::string, double> guess = {{"x", 1.0}, {"y", 1.0}};
-    return SolveNonLinearSystem(eqns, guess);
+    auto open_brace = input.find('{');
+    auto close_brace = input.find('}');
+    if (open_brace == std::string::npos || close_brace == std::string::npos) return {{}, EngineErrorResult(CalcErr::ArgumentMismatch)};
+    std::string eq_content = input.substr(open_brace + 1, close_brace - open_brace - 1);
+    
+    auto open_bracket = input.find('[', close_brace);
+    auto close_bracket = input.find(']', open_bracket);
+    if (open_bracket == std::string::npos || close_bracket == std::string::npos) return {{}, EngineErrorResult(CalcErr::ArgumentMismatch)};
+    std::string guess_content = input.substr(open_bracket + 1, close_bracket - open_bracket - 1);
+
+    auto raw_eqs = Utils::Split(eq_content, ';'); 
+    std::vector<std::string> final_equations;
+    for (const auto& raw_eq : raw_eqs) {
+        std::string eq = Utils::Trim(raw_eq);
+        if (eq.empty()) continue;
+        size_t eq_sign_pos = eq.find('=');
+        if (eq_sign_pos != std::string::npos) {
+            std::string lhs = eq.substr(0, eq_sign_pos);
+            std::string rhs = eq.substr(eq_sign_pos + 1);
+            eq = "(" + lhs + ") - (" + rhs + ")";
+        }
+        final_equations.push_back(eq);
+    }
+
+    auto raw_guesses = Utils::Split(guess_content, ',');
+    std::vector<double> guess_values;
+    for (const auto& val_str : raw_guesses) {
+        std::string trimmed = Utils::Trim(val_str);
+        if(Utils::IsNumber(trimmed)) guess_values.push_back(std::stod(trimmed));
+    }
+
+    std::map<std::string, double> guess_map;
+    std::vector<std::string> var_names = {"x", "y", "z", "a", "b", "c"};
+    for(size_t i=0; i<guess_values.size(); ++i) {
+        if(i < var_names.size()) guess_map[var_names[i]] = guess_values[i];
+    }
+
+    return SolveNonLinearSystem(final_equations, guess_map);
+}
+
+EngineResult AlgebraicParser::HandleDerivative(const std::string& input) {
+    std::stringstream ss(input);
+    std::string cmd, expression, var;
+    ss >> cmd;
+    std::getline(ss, expression);
+    expression = Utils::Trim(expression);
+    if (!expression.empty() && expression.back() == ';') expression.pop_back();
+    var = "x"; 
+
+    try {
+        NodePtr root = ParseExpression(expression);
+        NodePtr derivative = root->Derivative(arena_, var);
+        NodePtr simplified = derivative->Simplify(arena_)->Simplify(arena_);
+        return {EngineSuccessResult(simplified->ToString(Precedence::None)), {}}; 
+    } catch (...) {
+        return {{}, {EngineErrorResult(CalcErr::ParseError)}};
+    }
 }
 
 EngineResult AlgebraicParser::SolveQuadratic(double a, double b, double c) {
-    if (a == 0.0) {
-        if (b == 0.0) return {{}, {EngineErrorResult(CalcErr::IndeterminateResult)}};
-        return {EngineSuccessResult(Vector({-c / b})), {}};
-    }
-    double discriminant = b * b - 4 * a * c;
-    if (discriminant < 0) return {{}, {EngineErrorResult(CalcErr::NegativeRoot)}};
-    double sqrt_d = std::sqrt(discriminant);
-    double x1 = (-b + sqrt_d) / (2 * a);
-    double x2 = (-b - sqrt_d) / (2 * a);
-    if (std::abs(discriminant) < 1e-9) x2 = x1;
-    return {EngineSuccessResult(Vector({x1, x2})), {}};
-}
-
-std::vector<double> SolveLinearSystemSmall(std::vector<std::vector<double>> A, std::vector<double> b) {
-    int n = A.size();
-    for (int i=0; i<n; ++i) {
-        int pivot = i;
-        for (int j=i+1; j<n; ++j) if (std::abs(A[j][i]) > std::abs(A[pivot][i])) pivot = j;
-        std::swap(A[i], A[pivot]); std::swap(b[i], b[pivot]);
-        double div = A[i][i];
-        for (int j=i; j<n; ++j) A[i][j] /= div;
-        b[i] /= div;
-        for (int k=0; k<n; ++k) {
-            if (k != i) {
-                double factor = A[k][i];
-                for (int j=i; j<n; ++j) A[k][j] -= factor * A[i][j];
-                b[k] -= factor * b[i];
-            }
-        }
-    }
-    return b;
+    if (a == 0.0) return {{}, {EngineErrorResult(CalcErr::IndeterminateResult)}};
+    double d = b * b - 4 * a * c;
+    if (d < 0) return {{}, {EngineErrorResult(CalcErr::NegativeRoot)}};
+    double s = std::sqrt(d);
+    return {EngineSuccessResult(Vector({(-b + s) / (2 * a), (-b - s) / (2 * a)})), {}};
 }
 
 EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string>& equation_strs, std::map<std::string, double>& guess) {
-    int max_iter = 50;
-    double tolerance = 1e-6;
-    double epsilon = 1e-5;
-    
+    const int max_iter = 50;
+    const double epsilon = 1e-5;
+    std::vector<NodePtr> roots;
+    for(const auto& eq : equation_strs) roots.push_back(ParseExpression(eq));
+
     std::vector<std::string> var_names;
     for(auto const& [key, val] : guess) var_names.push_back(key);
-    int n = var_names.size(); 
-    
-    std::vector<std::queue<std::string>> rpns;
-    for(const auto& eq : equation_strs) rpns.push_back(ParseToRPN(eq));
+    int n = var_names.size();
 
     for (int iter = 0; iter < max_iter; ++iter) {
         std::vector<double> F(n);
         for(int i=0; i<n; ++i) {
-            auto res = EvaluateRPN(rpns[i], guess);
-            if (!res.result.has_value()) return res;
-            F[i] = std::get<double>(res.result.value());
+            try { F[i] = roots[i]->Evaluate(guess); } 
+            catch (...) { return {{}, EngineErrorResult(CalcErr::DomainError)}; }
         }
 
-        double error_norm = 0;
-        for(double val : F) error_norm += val*val;
-        if (std::sqrt(error_norm) < tolerance) break;
+        double err = 0; for(double v:F) err+=v*v;
+        if(std::sqrt(err) < 1e-6) break;
 
         std::vector<std::vector<double>> J(n, std::vector<double>(n));
         for (int j = 0; j < n; ++j) {
-            std::string var = var_names[j];
-            double original_val = guess[var];
-            guess[var] = original_val + epsilon;
+            std::string v = var_names[j];
+            double old = guess[v];
+            guess[v] += epsilon;
             for (int i = 0; i < n; ++i) {
-                auto res_plus = EvaluateRPN(rpns[i], guess);
-                double f_plus = std::get<double>(res_plus.result.value());
-                J[i][j] = (f_plus - F[i]) / epsilon;
+                J[i][j] = (roots[i]->Evaluate(guess) - F[i]) / epsilon;
             }
-            guess[var] = original_val;
+            guess[v] = old;
         }
 
         std::vector<double> neg_F = F;
         for(double& val : neg_F) val = -val;
-        std::vector<double> delta = SolveLinearSystemSmall(J, neg_F);
-        for(int i=0; i<n; ++i) guess[var_names[i]] += delta[i];
-    }
-    
-    std::vector<double> final_values;
-    for(const auto& name : var_names) final_values.push_back(guess[name]);
-    return {EngineSuccessResult(final_values), {}};
-}
-
-void AlgebraicParser::RegisterOperator(const std::string &op, const OperatorDetails &details)
-{
-    std::lock_guard<std::shared_mutex> lock(mutex_s);
-    ops_[op] = details;
-}
-
-void AlgebraicParser::RegisterUnaryOperator(const std::string &op, const UnaryOperatorDetails &details)
-{
-    std::lock_guard<std::shared_mutex> lock(mutex_s);
-    unary_ops_[op] = details;
-}
-
-bool AlgebraicParser::isNumber(const std::string &token) const
-{
-    if (token.empty()) return false;
-    char *end = nullptr;
-    std::strtod(token.c_str(), &end);
-    return end != token.c_str() && *end == '\0';
-}
-
-Precedence AlgebraicParser::get_precedence(const std::string &token) const
-{
-    if (ops_.count(token)) return ops_.at(token).precedence;
-    if (unary_ops_.count(token)) return unary_ops_.at(token).precedence;
-    return Precedence::None;
-}
-
-bool AlgebraicParser::isLeftAssociative(const std::string &token) const
-{
-    return token != "^";
-}
-
-bool AlgebraicParser::isSeparator(char c) const
-{
-    return c == ' ' || c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' || c == '^' || c == '%';
-}
-
-std::queue<std::string> AlgebraicParser::ParseToRPN(const std::string &expression)
-{
-    std::queue<std::string> output_queue;
-    std::stack<std::string> operator_stack;
-    std::string token;
-
-    for (size_t i = 0; i < expression.length(); ++i)
-    {
-        char c = expression[i];
-        if (c == ' ') continue;
-
-        if (isdigit(c) || c == '.')
-        {
-            token += c;
-            while (i + 1 < expression.length() && (isdigit(expression[i + 1]) || expression[i + 1] == '.'))
-            {
-                token += expression[++i];
-            }
-            output_queue.push(token);
-            token.clear();
-        }
-        else if (isalpha(c))
-        {
-            token += c;
-            while (i + 1 < expression.length() && isalpha(expression[i + 1]))
-            {
-                token += expression[++i];
-            }
-            if (ops_.count(token) || unary_ops_.count(token))
-            {
-                while (!operator_stack.empty() && operator_stack.top() != "(")
-                {
-                    std::string top = operator_stack.top();
-                    if ((isLeftAssociative(token) && get_precedence(token) <= get_precedence(top)) ||
-                        (!isLeftAssociative(token) && get_precedence(token) < get_precedence(top)))
-                    {
-                        output_queue.push(top);
-                        operator_stack.pop();
+        
+        auto SolveLinearSystemSmall = [](std::vector<std::vector<double>> A, std::vector<double> b) {
+            int n = A.size();
+            for (int i=0; i<n; ++i) {
+                int p=i; for(int k=i+1; k<n; ++k) if(std::abs(A[k][i]) > std::abs(A[p][i])) p=k;
+                std::swap(A[i], A[p]); std::swap(b[i], b[p]);
+                double div = A[i][i];
+                for (int j=i; j<n; ++j) A[i][j] /= div;
+                b[i] /= div;
+                for (int k=0; k<n; ++k) {
+                    if (k != i) {
+                        double factor = A[k][i];
+                        for (int j=i; j<n; ++j) A[k][j] -= factor * A[i][j];
+                        b[k] -= factor * b[i];
                     }
-                    else break;
                 }
-                operator_stack.push(token);
-            } else {
-                output_queue.push(token); 
             }
-            token.clear();
-        }
-        else if (isSeparator(c))
-        {
-            std::string op(1, c);
-            if (c == '(')
-            {
-                operator_stack.push(op);
-            }
-            else if (c == ')')
-            {
-                while (!operator_stack.empty() && operator_stack.top() != "(")
-                {
-                    output_queue.push(operator_stack.top());
-                    operator_stack.pop();
-                }
-                if (!operator_stack.empty()) operator_stack.pop();
-            }
-            else
-            {
-                while (!operator_stack.empty() && operator_stack.top() != "(")
-                {
-                    std::string top = operator_stack.top();
-                    if ((isLeftAssociative(op) && get_precedence(op) <= get_precedence(top)) ||
-                        (!isLeftAssociative(op) && get_precedence(op) < get_precedence(top)))
-                    {
-                        output_queue.push(top);
-                        operator_stack.pop();
-                    }
-                    else break;
-                }
-                operator_stack.push(op);
-            }
-        }
+            return b;
+        };
+
+        std::vector<double> d = SolveLinearSystemSmall(J, neg_F);
+        for(int i=0; i<n; ++i) guess[var_names[i]] += d[i];
     }
-
-    while (!operator_stack.empty())
-    {
-        output_queue.push(operator_stack.top());
-        operator_stack.pop();
-    }
-
-    return output_queue;
-}
-
-EngineResult AlgebraicParser::EvaluateRPN(std::queue<std::string> &rpn_queue, const std::map<std::string, double>& variables)
-{
-    std::stack<double> value_stack;
-
-    while (!rpn_queue.empty())
-    {
-        std::string token = rpn_queue.front();
-        rpn_queue.pop();
-
-        if (isNumber(token)) {
-            value_stack.push(std::stod(token));
-        }
-        else if (std::isalpha(token[0])) { 
-            if (variables.find(token) != variables.end()) {
-                value_stack.push(variables.at(token));
-            }
-            else if (unary_ops_.count(token)) {
-                 if (value_stack.empty()) return MAKE_ERROR(CalcErr::ArgumentMismatch);
-                 double val = value_stack.top(); value_stack.pop();
-                 EngineResult op_res = unary_ops_.at(token).operation({val});
-                 if (op_res.error.has_value()) return op_res;
-                 value_stack.push(std::get<double>(op_res.result.value()));
-            }
-            else {
-                return MAKE_ERROR(CalcErr::ArgumentMismatch);
-            }
-        }
-        else if (ops_.count(token))
-        {
-            if (value_stack.size() < 2) return MAKE_ERROR(CalcErr::ArgumentMismatch);
-            double val2 = value_stack.top(); value_stack.pop();
-            double val1 = value_stack.top(); value_stack.pop();
-            EngineResult op_res = ops_.at(token).operation({val1, val2});
-            if (op_res.error.has_value()) return op_res;
-            value_stack.push(std::get<double>(op_res.result.value()));
-        }
-    }
-
-    if (value_stack.size() != 1) return MAKE_ERROR(CalcErr::ArgumentMismatch);
-    return MAKE_SUCCESS(value_stack.top());
+    std::vector<double> res;
+    for(auto& name : var_names) res.push_back(guess[name]);
+    return {EngineSuccessResult(res), {}};
 }

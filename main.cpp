@@ -1,3 +1,9 @@
+/**
+ * @file main.cpp
+ * @brief Entry point for the Ogulator TUI application.
+ * Updated to support Context-based 'Ans' variable.
+ */
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -14,6 +20,8 @@
 #include "ftxui/dom/elements.hpp"
 
 #include "dynamic_calc.h"
+#include "string_helpers.h"
+#include "version.h"
 
 using namespace ftxui;
 
@@ -23,13 +31,6 @@ struct HistoryLine {
     bool is_bold;
 };
 
-std::string Trim(const std::string& str) {
-    size_t first = str.find_first_not_of(" \t\n\r");
-    if (std::string::npos == first) return "";
-    size_t last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, (last - first + 1));
-}
-
 void PrintHelp(std::vector<HistoryLine>& history, const std::string& target) {
     if (target.empty() || target == "general") {
         history.push_back({"--- OGULATOR COMMANDS ---", Color::Cyan, true});
@@ -38,7 +39,6 @@ void PrintHelp(std::vector<HistoryLine>& history, const std::string& target) {
         history.push_back({"  PgUp/PgDn     : Scroll Output Log", Color::White, false});
         history.push_back({"[GLOBAL]", Color::Yellow, true});
         history.push_back({"  help   : Show this menu", Color::White, false});
-        history.push_back({"  help modes : List all calculator modes", Color::White, false});
         history.push_back({"  clear  : Clear screen", Color::White, false});
         history.push_back({"  exit   : Close application", Color::White, false});
         history.push_back({"[MODES]", Color::Yellow, true});
@@ -47,53 +47,7 @@ void PrintHelp(std::vector<HistoryLine>& history, const std::string& target) {
         history.push_back({"-------------------------", Color::Cyan, false});
         return;
     }
-
-    if (target == "modes" || target == "help modes") {
-        history.push_back({"--- AVAILABLE MODES ---", Color::Cyan, true});
-        history.push_back({"[ALGEBRAIC]", Color::Yellow, true});
-        history.push_back({"  Scientific RPN/Shunting-Yard math engine.", Color::GrayLight, false});
-        history.push_back({"  Run 'help algebraic' for details.", Color::White, false});
-        history.push_back({"[LINEAR SYS]", Color::Yellow, true});
-        history.push_back({"  Advanced system solving and analysis.", Color::GrayLight, false});
-        history.push_back({"  Run 'help linear' for details.", Color::White, false});
-        history.push_back({"[COMPLEX]", Color::Yellow, true});
-        history.push_back({"  (Beta) Complex number arithmetic.", Color::GrayLight, false});
-        history.push_back({"-------------------------", Color::Cyan, false});
-        return;
-    }
-
-    if (target == "algebraic" || target == "modes algebraic") {
-        history.push_back({"--- ALGEBRAIC MODE COMMANDS ---", Color::Cyan, true});
-        history.push_back({"[SCIENTIFIC CALC]", Color::Yellow, true});
-        history.push_back({"  <expression>      : Evaluates standard math expressions.", Color::White, false});
-        history.push_back({"  Supported Fns     : sin, cos, tan, cot, sec, csc (All Arc/Hyp versions included).", Color::GrayLight, false});
-        history.push_back({"[SOLVER]", Color::Yellow, true});
-        history.push_back({"  quadratic a b c   : Solves ax^2 + bx + c = 0.", Color::White, false});
-        history.push_back({"  Ex: quadratic 1 -5 6", Color::GrayLight, false});
-        history.push_back({"[NON-LINEAR SOLVER]", Color::Yellow, true});
-        history.push_back({"  Uses Newton-Raphson Model to solve higher order non-linear equations", Color::GrayLight, false});
-        history.push_back({"  Ex: solve_nl {x^2+y^2=5; x-y=1} [1, 1]", Color::White, false});
-        history.push_back({"[SYNTAX]", Color::Yellow, true});
-        history.push_back({"  Note: Trigonometry functions expect Degree inputs.", Color::GrayLight, false});
-        history.push_back({"-------------------------", Color::Cyan, false});
-        return;
-    }
-
-    if (target == "linear" || target == "modes linear") {
-        history.push_back({"--- LINEAR SYSTEM COMMANDS ---", Color::Cyan, true});
-        history.push_back({"[SOLVER]", Color::Yellow, true});
-        history.push_back({"  <eqns>   : Solve Ax=b (Gauss-Jordan).", Color::White, false});
-        history.push_back({"  cramer   : Solve with Cramer's Rule.", Color::White, false});
-        history.push_back({"[ANALYSIS]", Color::Yellow, true});
-        history.push_back({"  qr [[..]]: QR Decomposition (Gram-Schmidt).", Color::White, false});
-        history.push_back({"  eigen [..]: Eigenvalues/Vectors (QR Algorithm).", Color::White, false});
-        history.push_back({"[SYNTAX]", Color::Yellow, true});
-        history.push_back({"  Matrix: [[1,2],[3,4]] OR 1 2; 3 4", Color::GrayLight, false});
-        history.push_back({"-------------------------", Color::Cyan, false});
-        return;
-    }
-
-    history.push_back({"Error: Unknown help topic or command.", Color::Red, true});
+    history.push_back({"Error: Unknown help topic.", Color::Red, true});
 }
 
 void AddResultToHistory(const EngineResult& result, std::vector<HistoryLine>& history) {
@@ -115,7 +69,6 @@ void AddResultToHistory(const EngineResult& result, std::vector<HistoryLine>& hi
                 std::string msg = "Error: ";
                 switch (err) {
                     case LinAlgErr::NoSolution: msg += "Singular Matrix / No Unique Solution!"; break;
-                    case LinAlgErr::InfiniteSolutions: msg += "Infinite Solutions!"; break;
                     case LinAlgErr::MatrixMismatch: msg += "Matrix Dimensions Mismatch!"; break;
                     case LinAlgErr::ParseError: msg += "Input Parsing Failed!"; break;
                     default: msg += "Unknown Linear Algebra Error!"; break;
@@ -127,11 +80,12 @@ void AddResultToHistory(const EngineResult& result, std::vector<HistoryLine>& hi
     else if (result.result.has_value()) {
         std::visit([&](auto&& res) {
             using T = std::decay_t<decltype(res)>;
+            
             if constexpr (std::is_same_v<T, double>) {
                 history.push_back({"= " + std::to_string(res), Color::Green, true});
             } 
             else if constexpr (std::is_same_v<T, std::vector<double>>) {
-                history.push_back({"Result Set / Vector:", Color::Yellow, false});
+                history.push_back({"Result Vector:", Color::Yellow, false});
                 std::string s = "[ ";
                 for (double d : res) s += std::to_string(d) + " ";
                 s += "]";
@@ -146,13 +100,10 @@ void AddResultToHistory(const EngineResult& result, std::vector<HistoryLine>& hi
                     history.push_back({s, Color::Cyan, false});
                 }
             }
-            #ifdef __cpp_lib_complex
-            else if constexpr (std::is_same_v<T, std::complex<double>>) {
-                std::stringstream ss;
-                ss << "(" << res.real() << " + " << res.imag() << "i)";
-                history.push_back({ss.str(), Color::Magenta, true});
+            else if constexpr (std::is_same_v<T, std::string>) {
+                history.push_back({"Symbolic Result:", Color::Yellow, false});
+                history.push_back({"  " + res, Color::Cyan, true});
             }
-            #endif
         }, result.result.value());
     }
 }
@@ -171,9 +122,11 @@ int main() {
     int history_index = 0;
 
     std::string mode_str = "ALGEBRAIC";
+    double last_ans_value = 0.0;
 
-    history.push_back({"OGULATOR v2.4 (Stable) - Ready", Color::White, true});
-    history.push_back({"Type 'help' for commands. Use Arrows/PgUp/PgDn.", Color::GrayLight, false});
+    history.push_back({"OGULATOR v" PROJECT_VER_STRING " (Symbolic) - Ready", Color::White, true});
+    history.push_back({"Build: " BUILD_TIMESTAMP, Color::GrayLight, false});
+    history.push_back({"Type 'help' for commands.", Color::GrayLight, false});
 
     InputOption option;
     option.placeholder = "Type expression here...";
@@ -185,9 +138,20 @@ int main() {
     auto component = CatchEvent(input_component, [&](Event event) {
         if (event == Event::Return) {
             std::string raw_input = input_buffer;
-            std::string cmd = Trim(raw_input);
+            std::string cmd = Utils::Trim(raw_input);
 
             if (cmd.empty()) return true;
+
+            // Implicit Ans: If operator is first char, prepend 'Ans'
+            if (!cmd.empty()) {
+                char first = cmd[0];
+                if (first == '+' || first == '-' || first == '*' || first == '/' || first == '^' || first == '%') {
+                    cmd = "Ans" + cmd;
+                }
+            }
+
+            // [FIXED] Removed Utils::ReplaceAns call.
+            // Ans is now handled via Context injection.
 
             history.push_back({">> " + raw_input, Color::White, false});
             
@@ -195,7 +159,6 @@ int main() {
                 command_history.push_back(raw_input);
             }
             history_index = command_history.size();
-
             scroll_offset = 0; 
 
             if (cmd == "exit") {
@@ -206,37 +169,46 @@ int main() {
             else if (cmd == "clear") {
                 history.clear();
                 history.push_back({"Screen Cleared", Color::GrayLight, false});
+                last_ans_value = 0.0; 
             }
             else if (cmd == "help") {
                 PrintHelp(history, "");
             }
-            else if (cmd.rfind("help ", 0) == 0) {
-                 std::string target = Trim(cmd.substr(5));
-                 PrintHelp(history, target);
-            }
-            else if (cmd == "mode linear") {
-                engine.SetMode(CalcMode::LinearSystem);
-                mode_str = "LINEAR SYS";
-                history.push_back({"Mode switched to LINEAR SYSTEM", Color::Yellow, true});
-            }
-            else if (cmd == "mode algebraic") {
-                engine.SetMode(CalcMode::Algebraic);
-                mode_str = "ALGEBRAIC";
-                history.push_back({"Mode switched to ALGEBRAIC", Color::Yellow, true});
-            }
-            else if (cmd == "mode complex") {
-                mode_str = "COMPLEX";
-                history.push_back({"Mode switched to COMPLEX (Beta)", Color::Magenta, true});
+            else if (cmd.rfind("mode ", 0) == 0) {
+                if (cmd == "mode linear") {
+                    engine.SetMode(CalcMode::LinearSystem);
+                    mode_str = "LINEAR SYS";
+                    history.push_back({"Switched to LINEAR SYSTEM", Color::Yellow, true});
+                } else {
+                    engine.SetMode(CalcMode::Algebraic);
+                    mode_str = "ALGEBRAIC";
+                    history.push_back({"Switched to ALGEBRAIC", Color::Yellow, true});
+                }
             }
             else {
-                auto result = engine.Evaluate(cmd);
+                // [NEW] Inject 'Ans' as a variable in the context
+                std::map<std::string, double> context;
+                context["Ans"] = last_ans_value;
+
+                // Call Engine
+                auto result = engine.EvaluateWithContext(cmd, context);
                 AddResultToHistory(result, history);
+
+                if (result.result.has_value()) {
+                    std::visit([&](auto&& res) {
+                        using T = std::decay_t<decltype(res)>;
+                        if constexpr (std::is_same_v<T, double>) {
+                            last_ans_value = res;
+                        }
+                    }, result.result.value());
+                }
             }
 
             input_buffer = "";
             cursor_position = 0;
             return true;
         }
+        // ... (Arrow key handling same as before) ...
         else if (event == Event::ArrowUp) {
             if (command_history.empty()) return true;
             if (history_index > 0) {
@@ -250,23 +222,14 @@ int main() {
             if (command_history.empty()) return true;
             if (history_index < command_history.size()) {
                 history_index++;
-                if (history_index == command_history.size()) {
-                    input_buffer = "";
-                } else {
-                    input_buffer = command_history[history_index];
-                }
+                if (history_index == command_history.size()) input_buffer = "";
+                else input_buffer = command_history[history_index];
                 cursor_position = input_buffer.size();
             }
             return true;
         }
-        else if (event == Event::PageUp || event.mouse().button == Mouse::WheelUp) {
-            scroll_offset++; 
-            return true;
-        }
-        else if (event == Event::PageDown || event.mouse().button == Mouse::WheelDown) {
-            if (scroll_offset > 0) scroll_offset--; 
-            return true;
-        }
+        else if (event == Event::PageUp) { scroll_offset++; return true; }
+        else if (event == Event::PageDown) { if (scroll_offset > 0) scroll_offset--; return true; }
 
         return false;
     });
@@ -275,14 +238,9 @@ int main() {
         Elements history_elements;
         int visible_lines = 16; 
         int total_lines = history.size();
+        if (scroll_offset > total_lines - visible_lines) scroll_offset = std::max(0, total_lines - visible_lines);
         
-        if (scroll_offset > total_lines - visible_lines) 
-            scroll_offset = std::max(0, total_lines - visible_lines);
-        
-        int start_index = std::max(0, total_lines - visible_lines - scroll_offset);
-        int end_index = std::max(0, total_lines - scroll_offset);
-
-        for (int i = start_index; i < end_index && i < total_lines; ++i) {
+        for (int i = std::max(0, total_lines - visible_lines - scroll_offset); i < total_lines - scroll_offset; ++i) {
             auto& line = history[i];
             auto text_el = text(line.content) | color(line.color);
             if (line.is_bold) text_el |= bold;
@@ -293,8 +251,7 @@ int main() {
             hbox({
                 text(" OGULATOR ") | bold | color(Color::Black) | bgcolor(Color::Cyan),
                 filler(),
-                text(" MODE: " + mode_str + " ") | color(Color::White) | bgcolor(Color::Blue),
-                text(" BAT: 98% ") | color(Color::Green)
+                text(" MODE: " + mode_str + " ") | color(Color::White) | bgcolor(Color::Blue)
             }),
             separator(),
             vbox(history_elements) | flex,
