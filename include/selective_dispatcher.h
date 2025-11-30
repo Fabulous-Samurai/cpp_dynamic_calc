@@ -29,7 +29,7 @@
 
 #include "dynamic_calc_types.h"
 
-namespace OGulator {
+namespace AXIOM {
 
 /**
  * @brief Available computation engines
@@ -241,6 +241,6 @@ namespace Dispatch {
 #define DISPATCH_TIMER(op) DispatchTimer timer(op)
 #define SENNA_DISPATCH(op) DispatchTimer timer("🏎️ " + std::string(op))
 
-} // namespace OGulator
+} // namespace AXIOM
 
 #endif // SELECTIVE_DISPATCHER_H

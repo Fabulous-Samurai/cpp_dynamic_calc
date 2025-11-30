@@ -10,7 +10,7 @@
 #include <vector>
 #include <memory>
 
-namespace OGulator {
+namespace AXIOM {
 
 /**
  * @brief CPU optimization utilities
@@ -27,6 +27,6 @@ private:
     static bool DetectAVX2();
 };
 
-} // namespace OGulator
+} // namespace AXIOM
 
 #endif // CPU_OPTIMIZATION_H

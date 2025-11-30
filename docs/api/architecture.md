@@ -1,9 +1,9 @@
-# 🎯 OGULATOR v3.0 - Architecture Documentation
+# 🎯 AXIOM v3.0 - Architecture Documentation
 
 ## Enhanced Directory Structure
 
 ```
-ogulator/
+axiom/
 ├── 📁 core/                    # Core computational engines
 │   ├── engine/                 # C++ mathematical engines
 │   │   ├── eigen_engine.cpp    # Eigen-optimized CPU engine
@@ -16,7 +16,7 @@ ogulator/
 ├── 📁 gui/                     # User interfaces
 │   ├── python/                 # Python GUI applications
 │   │   ├── matlab_alternative_gui.py # MATLAB-style interface
-│   │   └── ogulator_gui.py     # Original calculator GUI
+│   │   └── axiom_gui.py     # Original calculator GUI
 │   └── qt/                     # Qt-based interfaces (future)
 ├── 📁 tools/                   # Analysis and visualization
 │   ├── analysis/               # Mathematical analysis tools
@@ -89,7 +89,7 @@ ogulator/
 
 #### 🧮 Original Calculator GUI
 - **Purpose**: Enhanced calculator interface
-- **Location**: `gui/python/ogulator_gui.py`
+- **Location**: `gui/python/axiom_gui.py`
 - **Features**:
   - 12 calculation modes
   - Performance metrics
@@ -187,4 +187,4 @@ public:
 | Complex Functions | <50ms | Selective |
 | Visualization | <200ms | Python/GPU |
 
-This architecture ensures OGULATOR v3.0 delivers professional-grade performance while maintaining ease of use and extensibility.
+This architecture ensures AXIOM v3.0 delivers professional-grade performance while maintaining ease of use and extensibility.

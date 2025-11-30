@@ -11,7 +11,7 @@
 #include <regex>
 #include <cmath>
 
-namespace OGulator {
+namespace AXIOM {
 
 // Global dispatcher instance
 std::unique_ptr<SelectiveDispatcher> g_dispatcher;
@@ -99,11 +99,11 @@ EngineResult SelectiveDispatcher::DispatchOperation(const std::string& operation
                 break;
 #endif
 
-#ifdef ENABLE_NANOBIND
+            // Python engine disabled for pure C++ performance
             case ComputeEngine::Python:
-                result = DispatchToPython(operation, args);
+                // Redirect Python requests to native C++ engine
+                result = DispatchToNative(operation, args);
                 break;
-#endif
                 
             default:
                 result = DispatchToNative(operation, args);  // Fallback
@@ -198,15 +198,12 @@ ComputeEngine SelectiveDispatcher::SelectBestEngine(const std::string& operation
 #endif
     }
     
-    // For symbolic operations, prefer Python
+    // For symbolic operations, use native C++ for maximum speed
     if (operation.find("symbolic") != std::string::npos ||
         operation.find("derive") != std::string::npos ||
         operation.find("integrate") != std::string::npos) {
-#ifdef ENABLE_NANOBIND
-        if (IsEngineAvailable(ComputeEngine::Python)) {
-            return ComputeEngine::Python;
-        }
-#endif
+        // Force native C++ engine - no Python fallbacks
+        return ComputeEngine::Native;
     }
     
     // Learning-based selection (if enabled)
@@ -282,8 +279,8 @@ size_t SelectiveDispatcher::EstimateDataSize(const std::vector<std::string>& arg
 
 EngineResult SelectiveDispatcher::DispatchToNative(const std::string& operation, 
                                                   const std::vector<std::string>& args) {
-    // Use existing CalcEngine for native operations
-    static CalcEngine native_engine;
+    // Use existing AXIOM::DynamicCalc for native operations
+    static AXIOM::DynamicCalc native_engine;
     
     // Create context for operation
     std::map<std::string, double> context;
@@ -597,4 +594,4 @@ namespace Dispatch {
     
 } // namespace Dispatch
 
-} // namespace OGulator
+} // namespace AXIOM

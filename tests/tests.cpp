@@ -10,6 +10,8 @@
 #include "dynamic_calc.h"
 #include "string_helpers.h"
 
+using namespace AXIOM;
+
 // =========================================================================
 // MICRO TEST FRAMEWORK (Dependency-Free)
 // =========================================================================
@@ -102,8 +104,8 @@ void Test_StringHelpers() {
 }
 
 void Test_AlgebraicBasic() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
 
     // 1. Order of Operations (PEMDAS)
     // 3 + 5 * 2 = 13 (NOT 16)
@@ -119,8 +121,8 @@ void Test_AlgebraicBasic() {
 }
 
 void Test_AlgebraicFunctions() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
 
     // 1. Trigonometry (Degrees)
     // sin(90) = 1
@@ -136,8 +138,8 @@ void Test_AlgebraicFunctions() {
 }
 
 void Test_NonLinearSolver() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
 
     // Test Case: Simple Linear within Non-Linear Solver
     // x + y = 10; x - y = 2 -> x=6, y=4
@@ -163,8 +165,8 @@ void Test_NonLinearSolver() {
 }
 
 void Test_LinearSystemParsing() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::LinearSystem);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::LINEAR_SYSTEM);
 
     // 1. Parse Matrix String
     // Input: [[1, 2], [3, 4]]
@@ -185,8 +187,8 @@ void Test_LinearSystemParsing() {
 }
 
 void Test_MatrixOperations() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::LinearSystem);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::LINEAR_SYSTEM);
 
     // Eigenvalues of Identity Matrix [[1,0],[0,1]] are 1, 1
     // Command: eigen [[1,0],[0,1]]
@@ -202,8 +204,8 @@ void Test_MatrixOperations() {
 }
 
 void Test_ErrorHandling() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
 
     // 1. Division by Zero
     auto div_zero = engine.Evaluate("5 / 0");
@@ -241,28 +243,28 @@ void Test_ErrorHandling() {
 }
 
 void Test_ModeTransitions() {
-    CalcEngine engine;
+    DynamicCalc engine;
     
     // Test mode switching
-    engine.SetMode(CalcMode::Algebraic);
+    engine.SetMode(CalculationMode::ALGEBRAIC);
     auto alg_result = engine.Evaluate("2 + 3");
     ASSERT_NEAR(GetDouble(alg_result), 5.0, 1e-9);
     
-    engine.SetMode(CalcMode::LinearSystem);
-    engine.SetMode(CalcMode::Statistics);
-    engine.SetMode(CalcMode::Units);
-    engine.SetMode(CalcMode::Plotting);
-    engine.SetMode(CalcMode::Symbolic);
+    engine.SetMode(CalculationMode::LINEAR_SYSTEM);
+    engine.SetMode(CalculationMode::STATISTICS);
+    engine.SetMode(CalculationMode::UNITS);
+    engine.SetMode(CalculationMode::PLOT);
+    engine.SetMode(CalculationMode::SYMBOLIC);
     
     // Switch back to algebraic
-    engine.SetMode(CalcMode::Algebraic);
+    engine.SetMode(CalculationMode::ALGEBRAIC);
     auto alg_result2 = engine.Evaluate("3 * 4");
     ASSERT_NEAR(GetDouble(alg_result2), 12.0, 1e-9);
 }
 
 void Test_EdgeCases() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
     
     // Test precision with many decimal places
     auto precise = engine.Evaluate("1.23456789");
@@ -361,8 +363,8 @@ void Test_StringEdgeCases() {
 }
 
 void Test_CalculusOperations() {
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
     
     std::cout << "[INFO] Testing calculus operations (limits and integrals)" << std::endl;
     
@@ -454,8 +456,8 @@ void Test_CalculusOperations() {
 void Test_PlotFunctions() {
     std::cout << "[RUNNING] Test_PlotFunctions..." << std::endl;
     
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
     
     // Test basic plotting - should not crash but may not render properly yet
     // We'll test that the function doesn't throw exceptions
@@ -476,8 +478,8 @@ void Test_PlotFunctions() {
 void Test_SymbolicOperations() {
     std::cout << "[RUNNING] Test_SymbolicOperations..." << std::endl;
     
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Symbolic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::SYMBOLIC);
     
     // Test derivative function - may not be fully implemented yet
     bool derive_works = false;
@@ -508,8 +510,8 @@ void Test_SymbolicOperations() {
 void Test_UnitConversions() {
     std::cout << "[RUNNING] Test_UnitConversions..." << std::endl;
     
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Units);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::UNITS);
     
     // Test basic unit conversions
     // Note: These may not be fully implemented yet, so we test gracefully
@@ -530,8 +532,8 @@ void Test_UnitConversions() {
 void Test_StatisticalOperations() {
     std::cout << "[RUNNING] Test_StatisticalOperations..." << std::endl;
     
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Statistics);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::STATISTICS);
     
     // Test statistical functions
     bool stats_works = false;
@@ -551,8 +553,8 @@ void Test_StatisticalOperations() {
 void Test_ComplexOperations() {
     std::cout << "[RUNNING] Test_ComplexOperations..." << std::endl;
     
-    CalcEngine engine;
-    engine.SetMode(CalcMode::Algebraic);
+    DynamicCalc engine;
+    engine.SetMode(CalculationMode::ALGEBRAIC);
     
     // Test complex mathematical expressions
     ASSERT_NEAR(GetDouble(engine.Evaluate("sqrt(16) + log(100) + sin(45)")), 
@@ -580,7 +582,7 @@ void Test_ComplexOperations() {
 
 int main() {
     std::cout << "======================================\n";
-    std::cout << "   OGULATOR BULLETPROOF TEST SUITE    \n";
+    std::cout << "   AXIOM BULLETPROOF TEST SUITE    \n";
     std::cout << "======================================\n";
 
     RUN_TEST(Test_StringHelpers);

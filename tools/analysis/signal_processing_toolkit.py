@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 OGULATOR Signal Processing Toolkit 
+🚀 AXIOM Signal Processing Toolkit 
 Advanced signal analysis and processing capabilities
 """
 
@@ -496,7 +496,7 @@ class SignalProcessingToolkit:
     
     def demonstrate_toolkit(self):
         """Demonstrate signal processing capabilities"""
-        print("🎛️ OGULATOR Signal Processing Toolkit Demonstration")
+        print("🏛️ AXIOM Signal Processing Toolkit Demonstration")
         print("=" * 60)
         
         # Create test signals

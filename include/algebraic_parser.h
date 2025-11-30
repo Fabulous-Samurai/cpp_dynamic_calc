@@ -27,7 +27,18 @@ public:
     Arena& operator=(const Arena&) = delete;
     
     void allocateBlock(size_t size) { char* mem = new char[size]; blocks.push_back({mem, size, 0}); }
-    void reset() { for (auto& block : blocks) delete[] block.memory; blocks.clear(); allocateBlock(1024 * 64); }
+    void reset() { 
+        // AXIOM v3.1: Rewind Strategy - prevent heap fragmentation in Daemon Mode
+        if (!blocks.empty() && blocks[0].size >= 1024 * 64) {
+            // Rewind: Reset used offset instead of deallocating
+            for (auto& block : blocks) block.used = 0;
+        } else {
+            // First allocation or insufficient capacity: reallocate
+            for (auto& block : blocks) delete[] block.memory;
+            blocks.clear();
+            allocateBlock(1024 * 64);
+        }
+    }
     
     template <typename T, typename... Args>
     T* alloc(Args&&... args) {
@@ -60,26 +71,49 @@ struct ExprNode;
 using NodePtr = ExprNode*;
 
 struct EvalResult {
-    std::optional<double> value;
+    // AXIOM v3.1: Enhanced to support complex numbers
+    std::optional<AXIOM::Number> value;
     CalcErr error = CalcErr::None;
 
     static EvalResult Success(double val) {
+        EvalResult result;
+        result.value = AXIOM::Number(val);
+        result.error = CalcErr::None;
+        return result;
+    }
+    
+    static EvalResult Success(const std::complex<double>& val) {
+        EvalResult result;
+        result.value = AXIOM::Number(val);
+        result.error = CalcErr::None;
+        return result;
+    }
+    
+    static EvalResult Success(const AXIOM::Number& val) {
         EvalResult result;
         result.value = val;
         result.error = CalcErr::None;
         return result;
     }
+    
     static EvalResult Failure(CalcErr err) {
         EvalResult result;
         result.error = err;
         return result;
     }
+    
     bool HasValue() const { return value.has_value() && error == CalcErr::None; }
+    
+    // Legacy compatibility for existing code
+    std::optional<double> GetDouble() const {
+        return value.has_value() ? std::optional<double>(AXIOM::GetReal(value.value())) : std::nullopt;
+    }
 };
 
 struct ExprNode {
     virtual ~ExprNode() = default;
-    virtual EvalResult Evaluate(const std::map<std::string, double>& vars) const = 0;
+    // AXIOM v3.1: Enhanced context to support complex variables
+    virtual EvalResult Evaluate(const std::map<std::string, AXIOM::Number>& vars) const = 0;
     virtual NodePtr Derivative(Arena& arena, std::string_view var) const = 0;
     virtual NodePtr Simplify(Arena& arena) const = 0;
 
@@ -100,8 +134,18 @@ public:
     // Standard execution
     EngineResult ParseAndExecute(const std::string& input) override;
     
-    // [NEW] Execution with Context (Critical for 'Ans' variable)
-    EngineResult ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, double>& context);
+    // [NEW] Execution with Context (Critical for 'Ans' variable and complex numbers)
+    EngineResult ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, AXIOM::Number>& context);
+    
+    // Legacy compatibility method
+    EngineResult ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, double>& context) {
+        // Convert double context to Number context
+        std::map<std::string, AXIOM::Number> number_context;
+        for (const auto& [key, value] : context) {
+            number_context[key] = AXIOM::Number(value);
+        }
+        return ParseAndExecuteWithContext(input, number_context);
+    }
 
 private:
     Arena arena_;

@@ -30,7 +30,7 @@
 namespace nb = nanobind;
 using namespace nb::literals;
 
-namespace OGulator {
+namespace AXIOM {
 
 /**
  * @brief Performance metrics for Python-C++ interop
@@ -67,11 +67,11 @@ public:
     
 #ifdef ENABLE_EIGEN
     // Eigen integration with zero-copy
-    OGulator::EigenEngine::Matrix ConvertFromNumPyMatrix(const nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>>& array);
-    nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>> ConvertToNumPyMatrix(const OGulator::EigenEngine::Matrix& matrix);
+    AXIOM::EigenEngine::Matrix ConvertFromNumPyMatrix(const nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>>& array);
+    nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>> ConvertToNumPyMatrix(const AXIOM::EigenEngine::Matrix& matrix);
     
-    OGulator::EigenEngine::Vector ConvertFromNumPyVector(const nb::ndarray<nb::numpy, double>& array);
-    nb::ndarray<nb::numpy, double> ConvertToNumPyVector(const OGulator::EigenEngine::Vector& vector);
+    AXIOM::EigenEngine::Vector ConvertFromNumPyVector(const nb::ndarray<nb::numpy, double>& array);
+    nb::ndarray<nb::numpy, double> ConvertToNumPyVector(const AXIOM::EigenEngine::Vector& vector);
 #endif
     
     // Advanced Python integration
@@ -186,8 +186,8 @@ namespace Nanobind {
     
 #ifdef ENABLE_EIGEN
     // Eigen-NumPy bridge
-    OGulator::EigenEngine::Matrix MatrixFromNumPy(const nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>>& array);
-    nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>> MatrixToNumPy(const OGulator::EigenEngine::Matrix& matrix);
+    AXIOM::EigenEngine::Matrix MatrixFromNumPy(const nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>>& array);
+    nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>> MatrixToNumPy(const AXIOM::EigenEngine::Matrix& matrix);
 #endif
     
     // Performance helpers
@@ -196,12 +196,12 @@ namespace Nanobind {
     
 } // namespace Nanobind
 
-} // namespace OGulator
+} // namespace AXIOM
 
 // Nanobind module definition macros
-#define OGULATOR_NANOBIND_MODULE(name) NB_MODULE(name, m)
-#define OGULATOR_NANOBIND_CLASS(cls) nb::class_<cls>(m, #cls)
-#define OGULATOR_NANOBIND_FUNCTION(func) m.def(#func, &func)
+#define AXIOM_NANOBIND_MODULE(name) NB_MODULE(name, m)
+#define AXIOM_NANOBIND_CLASS(cls) nb::class_<cls>(m, #cls)
+#define AXIOM_NANOBIND_FUNCTION(func) m.def(#func, &func)
 
 #endif // ENABLE_NANOBIND
 

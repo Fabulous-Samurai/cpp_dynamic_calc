@@ -11,10 +11,25 @@
 #endif
 #include <stdexcept>
 
+namespace AXIOM {
+
+std::string mode_to_string(CalculationMode mode) {
+    switch (mode) {
+        case CalculationMode::ALGEBRAIC: return "ALGEBRAIC";
+        case CalculationMode::LINEAR_SYSTEM: return "LINEAR_SYSTEM";
+        case CalculationMode::STATISTICS: return "STATISTICS";
+        case CalculationMode::SYMBOLIC: return "SYMBOLIC";
+        case CalculationMode::UNITS: return "UNITS";
+        case CalculationMode::PLOT: return "PLOT";
+        case CalculationMode::PYTHON: return "PYTHON";
+        default: return "UNKNOWN";
+    }
+}
+
 // Constructor: Initializes the calculator engine and registers parsers for each mode.
-CalcEngine::CalcEngine() {
-    parsers_[CalcMode::Algebraic] = std::make_unique<AlgebraicParser>(); // Algebraic mode parser.
-    parsers_[CalcMode::LinearSystem] = std::make_unique<LinearSystemParser>(); // Linear system mode parser.
+DynamicCalc::DynamicCalc() {
+    parsers_[CalculationMode::ALGEBRAIC] = std::make_unique<AlgebraicParser>(); // Algebraic mode parser.
+    parsers_[CalculationMode::LINEAR_SYSTEM] = std::make_unique<LinearSystemParser>(); // Linear system mode parser.
     
     // Initialize new engines
     unit_manager_ = std::make_unique<UnitManager>();
@@ -23,36 +38,42 @@ CalcEngine::CalcEngine() {
     plot_engine_ = std::make_unique<PlotEngine>();
     
     // Initialize unit parser
-    parsers_[CalcMode::Units] = std::make_unique<UnitParser>(unit_manager_.get());
+    parsers_[CalculationMode::UNITS] = std::make_unique<UnitParser>(unit_manager_.get());
     
 #ifdef ENABLE_PYTHON_FFI
-    // Initialize Python engine and parsers only if Python is available
-    python_engine_ = std::make_unique<PythonEngine>();
+    // Python engine disabled for pure C++ performance
+    // python_engine_ = std::make_unique<PythonEngine>();
     
-    // Initialize Python parsers for different modes
-    parsers_[CalcMode::Python] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::Interactive);
-    parsers_[CalcMode::PythonNumPy] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::NumPy);
-    parsers_[CalcMode::PythonSciPy] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::SciPy);
-    parsers_[CalcMode::PythonMatplotlib] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::Matplotlib);
-    parsers_[CalcMode::PythonPandas] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::Pandas);
-    parsers_[CalcMode::PythonSymPy] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::SymPy);
+    // Initialize Python parsers for different modes (disabled)
+    // parsers_[CalculationMode::PYTHON] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::Interactive);
+    // parsers_[CalculationMode::PYTHON_NUMPY] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::NumPy);
+    // parsers_[CalculationMode::PYTHON_SCIPY] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::SciPy);
+    // parsers_[CalculationMode::PYTHON_MATPLOTLIB] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::Matplotlib);
+    // parsers_[CalculationMode::PYTHON_PANDAS] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::Pandas);
+    // parsers_[CalculationMode::PYTHON_SYMPY] = std::make_unique<PythonParser>(python_engine_.get(), PythonMode::SymPy);
 #endif
 }
 
 // Sets the current calculation mode.
-// @param mode: The calculation mode to set (e.g., Algebraic, LinearSystem).
-void CalcEngine::SetMode(CalcMode mode) {
+// @param mode: The calculation mode to set (e.g., ALGEBRAIC, LINEAR_SYSTEM).
+void DynamicCalc::SetMode(CalculationMode mode) {
     current_mode_ = mode;
 }
 
 // Evaluates the given input string using the current calculation mode.
 // @param input: The input string to evaluate.
 // @return: The result of the evaluation as an EngineResult.
-EngineResult CalcEngine::Evaluate(const std::string &input) {
+EngineResult DynamicCalc::Evaluate(const std::string &input) {
    return EvaluateWithContext(input,{});
 }
 
-EngineResult CalcEngine::EvaluateWithContext(const std::string& input,const std::map<std::string,double>& context){
+// Calculate with explicit mode specification
+EngineResult DynamicCalc::calculate(const std::string& input, CalculationMode mode) {
+    SetMode(mode);
+    return Evaluate(input);
+}
+
+EngineResult DynamicCalc::EvaluateWithContext(const std::string& input,const std::map<std::string,double>& context){
     // DEBUG: Test if this function is called at all
     if (input == "test") {
         return {EngineSuccessResult("DEBUG: EvaluateWithContext called"), {}};
@@ -130,7 +151,7 @@ EngineResult CalcEngine::EvaluateWithContext(const std::string& input,const std:
         }
     }
     
-    if (input.find("stats ") == 0 && current_mode_ != CalcMode::Statistics) {
+    if (input.find("stats ") == 0 && current_mode_ != CalculationMode::STATISTICS) {
         // Handle basic stats commands like "stats mean [1,2,3,4]"
         return {{}, {CalcErr::OperationNotFound}}; // Placeholder
     }
@@ -142,10 +163,10 @@ EngineResult CalcEngine::EvaluateWithContext(const std::string& input,const std:
     
     auto it = parsers_.find(current_mode_);
     if(it == parsers_.end()){
-        // Special case: Plotting mode doesn't need a separate parser
-        if (current_mode_ == CalcMode::Plotting) {
+        // Special case: PLOT mode doesn't need a separate parser
+        if (current_mode_ == CalculationMode::PLOT) {
             // In plotting mode, treat input as algebraic expressions for plotting
-            auto algebraic_it = parsers_.find(CalcMode::Algebraic);
+            auto algebraic_it = parsers_.find(CalculationMode::ALGEBRAIC);
             if (algebraic_it != parsers_.end()) {
                 AlgebraicParser* alg_parser = static_cast<AlgebraicParser*>(algebraic_it->second.get());
                 return alg_parser->ParseAndExecuteWithContext(input, context);
@@ -154,8 +175,8 @@ EngineResult CalcEngine::EvaluateWithContext(const std::string& input,const std:
         return {{},{EngineErrorResult(CalcErr::OperationNotFound)}};
     }
 
-    if(current_mode_== CalcMode::Algebraic || current_mode_== CalcMode::Plotting){
-        CalcMode mode_to_use = (current_mode_ == CalcMode::Plotting) ? CalcMode::Algebraic : current_mode_;
+    if(current_mode_== CalculationMode::ALGEBRAIC || current_mode_== CalculationMode::PLOT){
+        CalculationMode mode_to_use = (current_mode_ == CalculationMode::PLOT) ? CalculationMode::ALGEBRAIC : current_mode_;
         auto parser_it = parsers_.find(mode_to_use);
         if (parser_it != parsers_.end()) {
             AlgebraicParser* alg_parser = static_cast<AlgebraicParser*>(parser_it->second.get());
@@ -165,3 +186,5 @@ EngineResult CalcEngine::EvaluateWithContext(const std::string& input,const std:
     
     return it->second->ParseAndExecute(input);
 }
+
+} // namespace AXIOM

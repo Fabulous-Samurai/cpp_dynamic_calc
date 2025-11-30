@@ -20,7 +20,7 @@
 #include <functional>
 #include <chrono>
 
-namespace OGulator {
+namespace AXIOM {
 
 /**
  * @brief Performance metrics for CPU operations
@@ -182,7 +182,7 @@ private:
 #define MEASURE_PERFORMANCE(op_name) PerformanceTimer timer(op_name)
 #define SENNA_SPEED_EIGEN(op_name) PerformanceTimer timer("🏎️ " + std::string(op_name))
 
-} // namespace OGulator
+} // namespace AXIOM
 
 #endif // ENABLE_EIGEN
 

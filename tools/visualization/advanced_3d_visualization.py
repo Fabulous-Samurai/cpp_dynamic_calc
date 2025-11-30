@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 OGULATOR 3D Visualization Suite
+🚀 AXIOM 3D Visualization Suite
 Advanced 3D plotting and visualization capabilities
 """
 
@@ -515,7 +515,7 @@ class Advanced3DVisualization:
     
     def demonstrate_3d_capabilities(self):
         """Demonstrate 3D visualization capabilities"""
-        print("🎯 OGULATOR 3D Visualization Suite Demonstration")
+        print("🎯 AXIOM 3D Visualization Suite Demonstration")
         print("=" * 60)
         
         # Surface plot

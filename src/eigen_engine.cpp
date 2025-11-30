@@ -20,7 +20,7 @@
 #include <omp.h>
 #endif
 
-namespace OGulator {
+namespace AXIOM {
 
 EigenEngine::EigenEngine() 
     : optimization_level_(CPUOptimizationLevel::SIMD)
@@ -432,6 +432,6 @@ void EigenEngine::UpdateMetrics(const std::string& operation, double time_ms, si
     mutable_this->last_metrics_.simd_used = simd_enabled_;
 }
 
-} // namespace OGulator
+} // namespace AXIOM
 
 #endif // ENABLE_EIGEN

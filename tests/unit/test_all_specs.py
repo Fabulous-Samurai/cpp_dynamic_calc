@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Test Suite for OGULATOR Calculator
+Comprehensive Test Suite for AXIOM Calculator
 Tests all specifications and modes
 """
 
@@ -71,7 +71,7 @@ class TestCppEngine(unittest.TestCase):
                 # Filter out UI elements
                 result_lines = [line for line in lines if 
                               not any(ui_element in line for ui_element in 
-                                    ['OGULATOR', '═', '│', 'Welcome', 'Mode:', 'Input:', 'Result:', 'Enter', 'exit', 'quit'])]
+                                    ['AXIOM', '═', '│', 'Welcome', 'Mode:', 'Input:', 'Result:', 'Enter', 'exit', 'quit'])]
                 
                 return {
                     'success': True,
@@ -456,7 +456,7 @@ class TestErrorHandling(unittest.TestCase):
 
 def run_all_tests():
     """Run all test suites"""
-    print("🧮 OGULATOR Comprehensive Test Suite")
+    print("🧮 AXIOM Comprehensive Test Suite")
     print("=" * 50)
     
     # Create test suite

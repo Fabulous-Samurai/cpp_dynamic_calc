@@ -1,6 +1,7 @@
 # Build artifacts and output
 build*/
 cmake-build*/
+ninja-build*/
 out/
 bin/
 lib/
@@ -17,6 +18,11 @@ lib/
 *.exp
 *.manifest
 *.res
+
+# Test executables and temporary files
+test_phase*.exe
+test_*.o
+main.o
 
 # Python artifacts
 __pycache__/

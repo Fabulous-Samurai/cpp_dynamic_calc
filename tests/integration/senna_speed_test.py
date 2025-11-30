@@ -15,9 +15,11 @@ def senna_speed_test():
     print("=" * 50)
     
     # Find the C++ executable
-    current_dir = Path(__file__).parent
+    current_dir = Path(__file__).parent.parent.parent  # Go back to project root
     executable_path = None
     possible_paths = [
+        current_dir / "ninja-build" / "axiom.exe",
+        current_dir / "build" / "axiom.exe",
         current_dir / "build-ninja" / "cpp_dynamic_calc.exe",
         current_dir / "build" / "cpp_dynamic_calc.exe",
         current_dir / "build-ninja" / "Debug" / "cpp_dynamic_calc.exe",
@@ -26,6 +28,7 @@ def senna_speed_test():
     for path in possible_paths:
         if path.exists():
             executable_path = str(path)
+            print(f"✅ Found AXIOM executable: {executable_path}")
             break
     
     if not executable_path:

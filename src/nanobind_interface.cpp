@@ -10,7 +10,7 @@
 #include <chrono>
 #include <sstream>
 
-namespace OGulator {
+namespace AXIOM {
 
 // Global instance
 std::unique_ptr<NanobindInterface> g_nanobind_interface;
@@ -135,14 +135,14 @@ nb::ndarray<nb::numpy, double> NanobindInterface::ConvertToNumPy(const std::vect
 }
 
 #ifdef ENABLE_EIGEN
-OGulator::EigenEngine::Matrix NanobindInterface::ConvertFromNumPyMatrix(
+AXIOM::EigenEngine::Matrix NanobindInterface::ConvertFromNumPyMatrix(
     const nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>>& array) {
     
-    return MeasureCall("ConvertFromNumPyMatrix", [&]() -> OGulator::EigenEngine::Matrix {
+    return MeasureCall("ConvertFromNumPyMatrix", [&]() -> AXIOM::EigenEngine::Matrix {
         size_t rows = array.shape(0);
         size_t cols = array.shape(1);
         
-        OGulator::EigenEngine::Matrix matrix(rows, cols);
+        AXIOM::EigenEngine::Matrix matrix(rows, cols);
         
         // Zero-copy mapping when memory layout is compatible
         if (array.stride(0) == cols * sizeof(double) && array.stride(1) == sizeof(double)) {
@@ -167,7 +167,7 @@ OGulator::EigenEngine::Matrix NanobindInterface::ConvertFromNumPyMatrix(
 }
 
 nb::ndarray<nb::numpy, double, nb::shape<nb::any, nb::any>> NanobindInterface::ConvertToNumPyMatrix(
-    const OGulator::EigenEngine::Matrix& matrix) {
+    const AXIOM::EigenEngine::Matrix& matrix) {
     
     return MeasureCall("ConvertToNumPyMatrix", [&]() {
         size_t rows = matrix.rows();
@@ -376,6 +376,6 @@ namespace Nanobind {
     
 } // namespace Nanobind
 
-} // namespace OGulator
+} // namespace AXIOM
 
 #endif // ENABLE_NANOBIND

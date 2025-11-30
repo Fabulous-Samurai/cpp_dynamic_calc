@@ -1,8 +1,8 @@
-# 📊 OGULATOR v3.0 - Performance Guide
+# 📊 AXIOM v3.0 - Performance Guide
 
 ## Senna Speed Performance Metrics
 
-OGULATOR v3.0 is optimized for Formula 1-level performance, achieving sub-millisecond execution for simple operations and maintaining professional-grade speed for complex computations.
+AXIOM v3.0 is optimized for Formula 1-level performance, achieving sub-millisecond execution for simple operations and maintaining professional-grade speed for complex computations.
 
 ## Performance Classification System
 
@@ -83,7 +83,8 @@ EngineResult SelectiveDispatcher::calculate(const std::string& expr) {
 
 ### Mathematical Operations
 
-| Operation | OGULATOR v3.0 | MATLAB R2024a | Python NumPy | Speedup |
+| Operation | AXIOM v3.0 | MATLAB R2024a | Python NumPy | Speedup |
+|-----------|------------|---------------|--------------|---------|
 |-----------|---------------|---------------|--------------|---------|
 | `2 + 3` | **0.8ms** | 4.2ms | 2.1ms | **5.3x** |
 | `sin(45) * cos(30)` | **1.2ms** | 6.8ms | 3.4ms | **5.7x** |
@@ -93,7 +94,8 @@ EngineResult SelectiveDispatcher::calculate(const std::string& expr) {
 
 ### Signal Processing
 
-| Operation | OGULATOR v3.0 | MATLAB R2024a | SciPy | Speedup |
+| Operation | AXIOM v3.0 | MATLAB R2024a | SciPy | Speedup |
+|-----------|------------|---------------|-------|---------|
 |-----------|---------------|---------------|-------|---------|
 | FFT (1K points) | **1.8ms** | 4.2ms | 3.1ms | **2.3x** |
 | FFT (1M points) | **15.2ms** | 28.4ms | 22.1ms | **1.9x** |
@@ -102,7 +104,8 @@ EngineResult SelectiveDispatcher::calculate(const std::string& expr) {
 
 ### 3D Visualization
 
-| Operation | OGULATOR v3.0 | MATLAB R2024a | Matplotlib | Speedup |
+| Operation | AXIOM v3.0 | MATLAB R2024a | Matplotlib | Speedup |
+|-----------|------------|---------------|------------|---------|
 |-----------|---------------|---------------|------------|---------|
 | Surface plot (50x50) | **180ms** | 320ms | 280ms | **1.8x** |
 | Parametric curve | **95ms** | 150ms | 130ms | **1.6x** |
@@ -220,4 +223,4 @@ python gui/python/matlab_alternative_gui.py
 
 ## Conclusion
 
-OGULATOR v3.0 delivers professional-grade performance that matches or exceeds commercial alternatives while remaining completely free. The Eigen-optimized architecture, combined with intelligent dispatching and zero-copy Python integration, ensures that mathematical computations execute at Senna speed - the performance level demanded by Formula 1 racing and professional scientific computing.
+AXIOM v3.0 delivers professional-grade performance that matches or exceeds commercial alternatives while remaining completely free. The Eigen-optimized architecture, combined with intelligent dispatching and zero-copy Python integration, ensures that mathematical computations execute at Senna speed - the performance level demanded by Formula 1 racing and professional scientific computing.

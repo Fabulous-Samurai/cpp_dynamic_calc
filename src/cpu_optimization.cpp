@@ -6,7 +6,7 @@
 #include "cpu_optimization.h"
 #include <iostream>
 
-namespace OGulator {
+namespace AXIOM {
 
 void CPUOptimization::Initialize() {
     std::cout << "🚀 CPU optimizations initialized" << std::endl;
@@ -32,4 +32,4 @@ bool CPUOptimization::DetectAVX2() {
     return true;  // Simplified detection
 }
 
-} // namespace OGulator
+} // namespace AXIOM

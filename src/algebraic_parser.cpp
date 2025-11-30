@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <set>
 
@@ -34,10 +35,28 @@ CalcErr NormalizeError(const EvalResult& res, CalcErr fallback = CalcErr::Argume
 }
 
 std::string FormatNumber(double val) {
-    std::string s = std::to_string(val);
-    s.erase(s.find_last_not_of('0') + 1, std::string::npos);
-    if (s.back() == '.') s.pop_back();
-    return s;
+    // Handle special cases
+    if (std::isinf(val)) return std::signbit(val) ? "-inf" : "inf";
+    if (std::isnan(val)) return "nan";
+    
+    // For integers or numbers that can be represented exactly
+    if (val == std::floor(val) && std::abs(val) < 1e15) {
+        return std::to_string(static_cast<long long>(val));
+    }
+    
+    // For normal floating point numbers
+    char buffer[64];
+    double abs_val = std::abs(val);
+    
+    if (abs_val >= 1e6 || (abs_val > 0 && abs_val < 1e-6)) {
+        // Use scientific notation for very large or very small numbers
+        sprintf(buffer, "%.6e", val);
+    } else {
+        // Use high precision for normal numbers - let's try 15 digits
+        sprintf(buffer, "%.15g", val);
+    }
+    
+    return std::string(buffer);
 }
 
 // ========================================================
@@ -65,6 +84,12 @@ struct VariableNode : ExprNode {
         auto it = vars.find(key);
         if (it != vars.end()) return EvalResult::Success(it->second);
         if (key == "Ans") return EvalResult::Success(0.0);
+        
+        // Mathematical constants
+        if (key == "pi" || key == "PI") return EvalResult::Success(PI_CONST);
+        if (key == "e" || key == "E") return EvalResult::Success(2.718281828459045);
+        if (key == "phi") return EvalResult::Success(1.618033988749895); // Golden ratio
+        
         return EvalResult::Failure(CalcErr::ArgumentMismatch);
     }
     
@@ -249,6 +274,16 @@ struct UnaryOpNode : ExprNode {
             return EvalResult::Success(std::log2(val));
         }
         if (func == "exp") return EvalResult::Success(std::exp(val));
+        
+        // Additional mathematical functions
+        if (func == "factorial") {
+            if (val < 0 || val != std::floor(val) || val > 170) return EvalResult::Failure(CalcErr::DomainError);
+            double result = 1.0;
+            for (int i = 2; i <= static_cast<int>(val); ++i) {
+                result *= i;
+            }
+            return EvalResult::Success(result);
+        }
         
         if (func == "u-") return EvalResult::Success(-val);
         return EvalResult::Success(0.0);
@@ -501,6 +536,85 @@ struct MultiArgFunctionNode : ExprNode {
             }
             
             return EvaluateNumericalIntegral(vars, var_name, a, b);
+        }
+        
+        // Basic multi-argument functions
+        if (func == "max") {
+            if (args.empty()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            double max_val = -std::numeric_limits<double>::infinity();
+            for (const auto& arg : args) {
+                auto result = arg->Evaluate(vars);
+                if (!result.HasValue()) return result;
+                max_val = std::max(max_val, *result.value);
+            }
+            return EvalResult::Success(max_val);
+        }
+        
+        if (func == "min") {
+            if (args.empty()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            double min_val = std::numeric_limits<double>::infinity();
+            for (const auto& arg : args) {
+                auto result = arg->Evaluate(vars);
+                if (!result.HasValue()) return result;
+                min_val = std::min(min_val, *result.value);
+            }
+            return EvalResult::Success(min_val);
+        }
+        
+        if (func == "gcd") {
+            if (args.size() != 2) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            auto a_result = args[0]->Evaluate(vars);
+            auto b_result = args[1]->Evaluate(vars);
+            if (!a_result.HasValue() || !b_result.HasValue()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            long long a = static_cast<long long>(*a_result.value);
+            long long b = static_cast<long long>(*b_result.value);
+            a = std::abs(a); b = std::abs(b);
+            
+            while (b != 0) {
+                long long temp = b;
+                b = a % b;
+                a = temp;
+            }
+            return EvalResult::Success(static_cast<double>(a));
+        }
+        
+        if (func == "lcm") {
+            if (args.size() != 2) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            auto a_result = args[0]->Evaluate(vars);
+            auto b_result = args[1]->Evaluate(vars);
+            if (!a_result.HasValue() || !b_result.HasValue()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            long long a = static_cast<long long>(*a_result.value);
+            long long b = static_cast<long long>(*b_result.value);
+            a = std::abs(a); b = std::abs(b);
+            
+            if (a == 0 || b == 0) return EvalResult::Success(0.0);
+            
+            // Calculate GCD first
+            long long gcd_val = a;
+            long long temp_b = b;
+            while (temp_b != 0) {
+                long long temp = temp_b;
+                temp_b = gcd_val % temp_b;
+                gcd_val = temp;
+            }
+            
+            long long lcm_val = (a / gcd_val) * b;
+            return EvalResult::Success(static_cast<double>(lcm_val));
+        }
+        
+        if (func == "mod" || func == "modulo") {
+            if (args.size() != 2) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            auto a_result = args[0]->Evaluate(vars);
+            auto b_result = args[1]->Evaluate(vars);
+            if (!a_result.HasValue() || !b_result.HasValue()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
+            
+            double a = *a_result.value;
+            double b = *b_result.value;
+            if (b == 0) return EvalResult::Failure(CalcErr::DivideByZero);
+            
+            return EvalResult::Success(std::fmod(a, b));
         }
         
         return EvalResult::Failure(CalcErr::OperationNotFound);
@@ -804,8 +918,10 @@ NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
         while(!func_name.empty() && std::isspace(static_cast<unsigned char>(func_name.back()))) func_name.remove_suffix(1);
         auto args_str = input.substr(paren_start + 1, input.size() - paren_start - 2);
         
-        // Check if this is a multi-argument function (limit, integrate, or plot)
-        if (func_name == "limit" || func_name == "integrate" || func_name == "plot") {
+        // Check if this is a multi-argument function
+        if (func_name == "limit" || func_name == "integrate" || func_name == "plot" || 
+            func_name == "max" || func_name == "min" || func_name == "gcd" || 
+            func_name == "lcm" || func_name == "mod" || func_name == "modulo") {
             std::vector<NodePtr> args;
             
             // Parse comma-separated arguments
@@ -861,6 +977,65 @@ EngineResult AlgebraicParser::ParseAndExecute(const std::string& input) {
 }
 
 EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, double>& context) {
+    // Basic syntax validation
+    std::string trimmed = input;
+    while (!trimmed.empty() && std::isspace(trimmed.front())) trimmed.erase(0, 1);
+    while (!trimmed.empty() && std::isspace(trimmed.back())) trimmed.pop_back();
+    
+    if (trimmed.empty()) {
+        return {{}, {EngineErrorResult(CalcErr::ParseError)}};
+    }
+    
+    // Check for invalid consecutive operators
+    for (size_t i = 0; i < trimmed.size() - 1; ++i) {
+        char c1 = trimmed[i];
+        char c2 = trimmed[i + 1];
+        if ((c1 == '+' || c1 == '-' || c1 == '*' || c1 == '/') && 
+            (c2 == '+' || c2 == '*' || c2 == '/')) {
+            return {{}, {EngineErrorResult(CalcErr::ParseError)}};
+        }
+    }
+    
+    // Check for balanced parentheses
+    int paren_count = 0;
+    for (char c : trimmed) {
+        if (c == '(') paren_count++;
+        else if (c == ')') paren_count--;
+        if (paren_count < 0) {
+            return {{}, {EngineErrorResult(CalcErr::ParseError)}};
+        }
+    }
+    if (paren_count != 0) {
+        return {{}, {EngineErrorResult(CalcErr::ParseError)}};
+    }
+    
+    // Check for unknown functions (basic validation)
+    static const std::set<std::string> known_functions = {
+        "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh",
+        "asinh", "acosh", "atanh", "log", "ln", "log2", "exp", "sqrt", "cbrt",
+        "abs", "factorial", "limit", "integrate", "max", "min", "gcd", "lcm",
+        "mod", "modulo", "sec", "csc", "cot", "asec", "acsc", "acot",
+        "sech", "csch", "coth", "asech", "acsch", "acoth"
+    };
+    
+    // Simple function validation (look for word followed by parentheses)
+    size_t pos = 0;
+    while ((pos = trimmed.find('(', pos)) != std::string::npos) {
+        // Find the start of the potential function name
+        size_t func_start = pos;
+        while (func_start > 0 && (std::isalpha(trimmed[func_start - 1]) || trimmed[func_start - 1] == '_')) {
+            func_start--;
+        }
+        
+        if (func_start < pos) {
+            std::string func_name = trimmed.substr(func_start, pos - func_start);
+            if (known_functions.find(func_name) == known_functions.end()) {
+                return {{}, {EngineErrorResult(CalcErr::ParseError)}};
+            }
+        }
+        pos++;
+    }
+    
     // Check cache first for performance
     std::string cache_key = input;
     for (const auto& [key, val] : context) {
