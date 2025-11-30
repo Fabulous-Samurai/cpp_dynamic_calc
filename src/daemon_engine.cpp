@@ -78,7 +78,7 @@ bool DaemonEngine::start() {
     status_.store(DaemonStatus::STARTING);
     
     if (!setup_pipe()) {
-        status_.store(DaemonStatus::ERROR);
+        status_.store(DaemonStatus::DAEMON_ERROR);
         return false;
     }
     

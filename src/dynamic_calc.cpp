@@ -76,7 +76,7 @@ EngineResult DynamicCalc::calculate(const std::string& input, CalculationMode mo
 EngineResult DynamicCalc::EvaluateWithContext(const std::string& input,const std::map<std::string,double>& context){
     // DEBUG: Test if this function is called at all
     if (input == "test") {
-        return {EngineSuccessResult("DEBUG: EvaluateWithContext called"), {}};
+        return EngineSuccessResult("DEBUG: EvaluateWithContext called");
     }
     
     // Handle special commands that work across all modes
@@ -139,7 +139,7 @@ EngineResult DynamicCalc::EvaluateWithContext(const std::string& input,const std
                     config.plot_char = '*';
                     
                     std::string plot_result = plot_engine_->PlotFunction(expression, config);
-                    return {EngineSuccessResult(plot_result), {}};
+                    return EngineSuccessResult(plot_result);
                     
                 } catch (const std::exception&) {
                     return {{}, {EngineErrorResult(CalcErr::ArgumentMismatch)}};

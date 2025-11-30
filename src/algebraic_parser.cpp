@@ -25,9 +25,9 @@ Precedence GetOpPrecedence(char op) {
 
 
 bool IsConst(const NodePtr node, double val) {
-    auto res = node->Evaluate({});
+    auto res = node->Evaluate(std::map<std::string, AXIOM::Number>{});
     if (!res.value.has_value()) return false;
-    return std::abs(*res.value - val) < 1e-9;
+    return std::abs(AXIOM::GetReal(res.value.value()) - val) < 1e-9;
 }
 
 CalcErr NormalizeError(const EvalResult& res, CalcErr fallback = CalcErr::ArgumentMismatch) {
@@ -68,7 +68,7 @@ struct NumberNode : ExprNode {
     NumberNode(double v) : value(v) {}
     
     
-    EvalResult Evaluate(const std::map<std::string, double>&) const override { return EvalResult::Success(value); }
+    EvalResult Evaluate(const std::map<std::string, AXIOM::Number>&) const override { return EvalResult::Success(value); }
     
     NodePtr Derivative(Arena& arena, std::string_view) const override { return arena.alloc<NumberNode>(0.0); }
     NodePtr Simplify(Arena& arena) const override { return arena.alloc<NumberNode>(value); }
@@ -79,7 +79,7 @@ struct VariableNode : ExprNode {
     std::string_view name;
     VariableNode(std::string_view n) : name(n) {}
     
-    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+    EvalResult Evaluate(const std::map<std::string, AXIOM::Number>& vars) const override {
         std::string key(name);
         auto it = vars.find(key);
         if (it != vars.end()) return EvalResult::Success(it->second);
@@ -106,13 +106,13 @@ struct BinaryOpNode : ExprNode {
     BinaryOpNode(char c, NodePtr l, NodePtr r) : op(c), left(l), right(r) {}
     
     // [KRİTİK] Bu fonksiyonu silersen NaN alırsın!
-    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+    EvalResult Evaluate(const std::map<std::string, AXIOM::Number>& vars) const override {
         auto left_eval = left->Evaluate(vars);
         if (!left_eval.HasValue()) return left_eval;
         auto right_eval = right->Evaluate(vars);
         if (!right_eval.HasValue()) return right_eval;
-        double l = *left_eval.value;
-        double r = *right_eval.value;
+        double l = AXIOM::GetReal(left_eval.value.value());
+        double r = AXIOM::GetReal(right_eval.value.value());
         switch(op) {
             case '+': {
                 auto safe_result = SafeMath::SafeAdd(l, r);
@@ -172,10 +172,10 @@ struct BinaryOpNode : ExprNode {
        
         bool l_const = false, r_const = false;
         double l_val = 0, r_val = 0;
-        auto l_eval = simple_left->Evaluate({});
-        if (l_eval.value.has_value()) { l_const = true; l_val = *l_eval.value; }
-        auto r_eval = simple_right->Evaluate({});
-        if (r_eval.value.has_value()) { r_const = true; r_val = *r_eval.value; }
+        auto l_eval = simple_left->Evaluate(std::map<std::string, AXIOM::Number>{});
+        if (l_eval.value.has_value()) { l_const = true; l_val = AXIOM::GetReal(l_eval.value.value()); }
+        auto r_eval = simple_right->Evaluate(std::map<std::string, AXIOM::Number>{});
+        if (r_eval.value.has_value()) { r_const = true; r_val = AXIOM::GetReal(r_eval.value.value()); }
 
         if (l_const && r_const) {
             if (op == '+') return arena.alloc<NumberNode>(l_val + r_val);
@@ -223,10 +223,10 @@ struct UnaryOpNode : ExprNode {
     UnaryOpNode(std::string_view f, NodePtr op) : func(f), operand(op) {}
     
   
-    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+    EvalResult Evaluate(const std::map<std::string, AXIOM::Number>& vars) const override {
         auto inner = operand->Evaluate(vars);
         if (!inner.HasValue()) return inner;
-        double val = *inner.value;
+        double val = AXIOM::GetReal(inner.value.value());
         if (func == "sin") return EvalResult::Success(std::sin(val * D2R));
         if (func == "cos") return EvalResult::Success(std::cos(val * D2R));
         if (func == "tan") return EvalResult::Success(std::tan(val * D2R));
@@ -490,7 +490,7 @@ struct MultiArgFunctionNode : ExprNode {
     MultiArgFunctionNode(std::string_view f, std::vector<NodePtr> arguments) 
         : func(f), args(std::move(arguments)) {}
     
-    EvalResult Evaluate(const std::map<std::string, double>& vars) const override {
+    EvalResult Evaluate(const std::map<std::string, AXIOM::Number>& vars) const override {
         if (func == "limit") {
             if (args.size() != 3) return EvalResult::Failure(CalcErr::ArgumentMismatch);
             
@@ -502,7 +502,7 @@ struct MultiArgFunctionNode : ExprNode {
             std::string var_name = std::string(var_node->name);
             auto point_result = args[2]->Evaluate(vars);
             if (!point_result.HasValue()) return point_result;
-            double approach_point = *point_result.value;
+            double approach_point = AXIOM::GetReal(point_result.value.value());
             
             // Check for infinite limit
             if (std::isinf(approach_point)) {
@@ -527,8 +527,8 @@ struct MultiArgFunctionNode : ExprNode {
                 return EvalResult::Failure(CalcErr::DomainError);
             }
             
-            double a = *lower_result.value;
-            double b = *upper_result.value;
+            double a = AXIOM::GetReal(lower_result.value.value());
+            double b = AXIOM::GetReal(upper_result.value.value());
             
             // Check for improper integrals
             if (std::isinf(a) || std::isinf(b)) {
@@ -545,7 +545,7 @@ struct MultiArgFunctionNode : ExprNode {
             for (const auto& arg : args) {
                 auto result = arg->Evaluate(vars);
                 if (!result.HasValue()) return result;
-                max_val = std::max(max_val, *result.value);
+                max_val = std::max(max_val, AXIOM::GetReal(result.value.value()));
             }
             return EvalResult::Success(max_val);
         }
@@ -556,7 +556,7 @@ struct MultiArgFunctionNode : ExprNode {
             for (const auto& arg : args) {
                 auto result = arg->Evaluate(vars);
                 if (!result.HasValue()) return result;
-                min_val = std::min(min_val, *result.value);
+                min_val = std::min(min_val, AXIOM::GetReal(result.value.value()));
             }
             return EvalResult::Success(min_val);
         }
@@ -567,8 +567,8 @@ struct MultiArgFunctionNode : ExprNode {
             auto b_result = args[1]->Evaluate(vars);
             if (!a_result.HasValue() || !b_result.HasValue()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
             
-            long long a = static_cast<long long>(*a_result.value);
-            long long b = static_cast<long long>(*b_result.value);
+            long long a = static_cast<long long>(AXIOM::GetReal(a_result.value.value()));
+            long long b = static_cast<long long>(AXIOM::GetReal(b_result.value.value()));
             a = std::abs(a); b = std::abs(b);
             
             while (b != 0) {
@@ -585,8 +585,8 @@ struct MultiArgFunctionNode : ExprNode {
             auto b_result = args[1]->Evaluate(vars);
             if (!a_result.HasValue() || !b_result.HasValue()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
             
-            long long a = static_cast<long long>(*a_result.value);
-            long long b = static_cast<long long>(*b_result.value);
+            long long a = static_cast<long long>(AXIOM::GetReal(a_result.value.value()));
+            long long b = static_cast<long long>(AXIOM::GetReal(b_result.value.value()));
             a = std::abs(a); b = std::abs(b);
             
             if (a == 0 || b == 0) return EvalResult::Success(0.0);
@@ -610,8 +610,8 @@ struct MultiArgFunctionNode : ExprNode {
             auto b_result = args[1]->Evaluate(vars);
             if (!a_result.HasValue() || !b_result.HasValue()) return EvalResult::Failure(CalcErr::ArgumentMismatch);
             
-            double a = *a_result.value;
-            double b = *b_result.value;
+            double a = AXIOM::GetReal(a_result.value.value());
+            double b = AXIOM::GetReal(b_result.value.value());
             if (b == 0) return EvalResult::Failure(CalcErr::DivideByZero);
             
             return EvalResult::Success(std::fmod(a, b));
@@ -660,16 +660,16 @@ struct MultiArgFunctionNode : ExprNode {
     }
 
 private:
-    EvalResult EvaluateNumericalLimit(const std::map<std::string, double>& vars, 
+    EvalResult EvaluateNumericalLimit(const std::map<std::string, AXIOM::Number>& vars, 
                                     const std::string& var_name, double approach_point) const {
         constexpr double epsilon = 1e-6;  // Relaxed tolerance
         constexpr int max_iterations = 20; // Reduced iterations for faster convergence
         
         auto evaluate_at = [&](double x) -> std::optional<double> {
-            std::map<std::string, double> local_vars = vars;
+            std::map<std::string, AXIOM::Number> local_vars = vars;
             local_vars[var_name] = x;
             auto result = args[0]->Evaluate(local_vars);
-            return result.HasValue() ? std::optional<double>(*result.value) : std::nullopt;
+            return result.HasValue() ? std::optional<double>(AXIOM::GetReal(result.value.value())) : std::nullopt;
         };
         
         // Try direct evaluation first (for continuous functions)
@@ -711,15 +711,15 @@ private:
         return EvalResult::Failure(CalcErr::IndeterminateResult);
     }
     
-    EvalResult EvaluateLimitAtInfinity(const std::map<std::string, double>& vars,
+    EvalResult EvaluateLimitAtInfinity(const std::map<std::string, AXIOM::Number>& vars,
                                      const std::string& var_name, bool positive_infinity) const {
         constexpr int max_iterations = 20;
         
         auto evaluate_at = [&](double x) -> std::optional<double> {
-            std::map<std::string, double> local_vars = vars;
+            std::map<std::string, AXIOM::Number> local_vars = vars;
             local_vars[var_name] = x;
             auto result = args[0]->Evaluate(local_vars);
-            return result.HasValue() ? std::optional<double>(*result.value) : std::nullopt;
+            return result.HasValue() ? std::optional<double>(AXIOM::GetReal(result.value.value())) : std::nullopt;
         };
         
         std::optional<double> prev_val;
@@ -754,17 +754,17 @@ private:
         return EvalResult::Failure(CalcErr::IndeterminateResult);
     }
     
-    EvalResult EvaluateNumericalIntegral(const std::map<std::string, double>& vars,
+    EvalResult EvaluateNumericalIntegral(const std::map<std::string, AXIOM::Number>& vars,
                                        const std::string& var_name, double a, double b) const {
         // Adaptive Simpson's Rule with error control
         constexpr double tolerance = 1e-12;
         constexpr int max_recursion = 15;
         
         auto f = [&](double x) -> double {
-            std::map<std::string, double> local_vars = vars;
+            std::map<std::string, AXIOM::Number> local_vars = vars;
             local_vars[var_name] = x;
             auto result = args[0]->Evaluate(local_vars);
-            return result.HasValue() ? *result.value : 0.0;
+            return result.HasValue() ? AXIOM::GetReal(result.value.value()) : 0.0;
         };
         
         std::function<double(double, double, double, double, double, int)> simpson_adaptive = 
@@ -804,7 +804,7 @@ private:
         }
     }
     
-    EvalResult EvaluateImproperIntegral(const std::map<std::string, double>& vars,
+    EvalResult EvaluateImproperIntegral(const std::map<std::string, AXIOM::Number>& vars,
                                       const std::string& var_name, double a, double b) const {
         // Handle improper integrals by taking limits
         constexpr double large_val = 1e6;
@@ -973,10 +973,10 @@ NodePtr AlgebraicParser::ParseExpression(std::string_view input) {
 }
 
 EngineResult AlgebraicParser::ParseAndExecute(const std::string& input) {
-    return ParseAndExecuteWithContext(input, {}); 
+    return ParseAndExecuteWithContext(input, std::map<std::string, AXIOM::Number>{}); 
 }
 
-EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, double>& context) {
+EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& input, const std::map<std::string, AXIOM::Number>& context) {
     // Basic syntax validation
     std::string trimmed = input;
     while (!trimmed.empty() && std::isspace(trimmed.front())) trimmed.erase(0, 1);
@@ -1039,12 +1039,21 @@ EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& inpu
     // Check cache first for performance
     std::string cache_key = input;
     for (const auto& [key, val] : context) {
-        cache_key += "_" + key + "=" + std::to_string(val);
+        std::string val_str;
+        if (AXIOM::IsReal(val)) {
+            val_str = std::to_string(AXIOM::GetReal(val));
+        } else {
+            auto c = AXIOM::GetComplex(val);
+            val_str = std::to_string(c.real()) + "+" + std::to_string(c.imag()) + "i";
+        }
+        cache_key += "_" + key + "=" + val_str;
     }
     if (eval_cache_.size() < MAX_CACHE_SIZE) {
         auto cache_it = eval_cache_.find(cache_key);
         if (cache_it != eval_cache_.end() && cache_it->second.value.has_value()) {
-            return {EngineSuccessResult(*cache_it->second.value), {}};
+            auto v = cache_it->second.value.value();
+            if (AXIOM::IsReal(v)) return EngineSuccessResult(AXIOM::GetReal(v));
+            return EngineSuccessResult(AXIOM::GetComplex(v));
         } else if (cache_it != eval_cache_.end()) {
             return {{}, {EngineErrorResult(cache_it->second.error)}};
         }
@@ -1074,12 +1083,15 @@ EngineResult AlgebraicParser::ParseAndExecuteWithContext(const std::string& inpu
     try {
         NodePtr root = ParseExpression(processed_input);
         auto evaluation = root->Evaluate(context);
-        if (evaluation.value.has_value()) {
+            if (evaluation.value.has_value()) {
             // Cache successful evaluation
             if (eval_cache_.size() < MAX_CACHE_SIZE) {
                 eval_cache_[cache_key] = evaluation;
             }
-            return {EngineSuccessResult(*evaluation.value), {}};
+            auto v = evaluation.value.value();
+            (void)0; // Debug prints removed
+            if (AXIOM::IsReal(v)) return EngineSuccessResult(AXIOM::GetReal(v));
+            return EngineSuccessResult(AXIOM::GetComplex(v));
         }
         CalcErr err = evaluation.error == CalcErr::None ? CalcErr::ArgumentMismatch : evaluation.error;
         // Cache error
@@ -1134,7 +1146,7 @@ EngineResult AlgebraicParser::HandleNonLinearSolve(const std::string& input) {
         if(Utils::IsNumber(trimmed)) guess_values.push_back(std::stod(trimmed));
     }
 
-    std::map<std::string, double> guess_map;
+    std::map<std::string, AXIOM::Number> guess_map;
     std::vector<std::string> var_names = {"x", "y", "z", "a", "b", "c"};
     for(size_t i=0; i<guess_values.size(); ++i) {
         if(i < var_names.size()) guess_map[var_names[i]] = guess_values[i];
@@ -1155,7 +1167,7 @@ EngineResult AlgebraicParser::HandleDerivative(const std::string& input) {
         NodePtr root = ParseExpression(expression);
         NodePtr derivative = root->Derivative(arena_, var);
         NodePtr simplified = derivative->Simplify(arena_)->Simplify(arena_);
-        return {EngineSuccessResult(simplified->ToString(Precedence::None)), {}}; 
+        return EngineSuccessResult(simplified->ToString(Precedence::None)); 
     } catch (...) {
         return {{}, {EngineErrorResult(CalcErr::ParseError)}};
     }
@@ -1166,10 +1178,10 @@ EngineResult AlgebraicParser::SolveQuadratic(double a, double b, double c) {
     double d = b * b - 4 * a * c;
     if (d < 0) return {{}, {EngineErrorResult(CalcErr::NegativeRoot)}};
     double s = std::sqrt(d);
-    return {EngineSuccessResult(Vector({(-b + s) / (2 * a), (-b - s) / (2 * a)})), {}};
+    return EngineSuccessResult(Vector({(-b + s) / (2 * a), (-b - s) / (2 * a)}));
 }
 
-EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string>& equation_strs, std::map<std::string, double>& guess) {
+EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string>& equation_strs, std::map<std::string, AXIOM::Number>& guess) {
     const int max_iter = 50;
     const double epsilon = 1e-5;
     std::vector<NodePtr> roots;
@@ -1182,25 +1194,25 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
         for(int i=0; i<n; ++i) {
             auto eval = roots[i]->Evaluate(guess);
             if (!eval.value.has_value()) {
-                return {{}, EngineErrorResult(NormalizeError(eval, CalcErr::DomainError))};
+                EngineResult err_res; err_res.error = EngineErrorResult(NormalizeError(eval, CalcErr::DomainError)); return err_res;
             }
-            F[i] = *eval.value;
+            F[i] = AXIOM::GetReal(eval.value.value());
         }
         double err = 0; for(double v:F) err+=v*v;
         if(std::sqrt(err) < 1e-6) break;
         std::vector<std::vector<double>> J(n, std::vector<double>(n));
         for (int j = 0; j < n; ++j) {
             std::string v = var_names[j];
-            double old = guess[v];
-            guess[v] += epsilon;
-            for (int i = 0; i < n; ++i) {
+            double old = AXIOM::GetReal(guess[v]);
+            guess[v] = AXIOM::Number(AXIOM::GetReal(guess[v]) + epsilon);
+                for (int i = 0; i < n; ++i) {
                 auto eval = roots[i]->Evaluate(guess);
                 if (!eval.value.has_value()) {
-                    return {{}, EngineErrorResult(NormalizeError(eval, CalcErr::DomainError))};
+                    EngineResult err_res; err_res.error = EngineErrorResult(NormalizeError(eval, CalcErr::DomainError)); return err_res;
                 }
-                J[i][j] = (*eval.value - F[i]) / epsilon;
+                J[i][j] = (AXIOM::GetReal(eval.value.value()) - F[i]) / epsilon;
             }
-            guess[v] = old;
+            guess[v] = AXIOM::Number(old);
         }
         std::vector<double> neg_F = F;
         for(double& val : neg_F) val = -val;
@@ -1223,11 +1235,11 @@ EngineResult AlgebraicParser::SolveNonLinearSystem(const std::vector<std::string
             return b;
         };
         std::vector<double> d = SolveLinearSystemSmall(J, neg_F);
-        for(int i=0; i<n; ++i) guess[var_names[i]] += d[i];
+        for(int i=0; i<n; ++i) guess[var_names[i]] = AXIOM::Number(AXIOM::GetReal(guess[var_names[i]]) + d[i]);
     }
     std::vector<double> res;
-    for(auto& name : var_names) res.push_back(guess[name]);
-    return {EngineSuccessResult(res), {}};
+    for(auto& name : var_names) res.push_back(AXIOM::GetReal(guess[name]));
+    return EngineSuccessResult(res);
 }
 
 EngineResult AlgebraicParser::HandlePlotFunction(const std::string& input) {
@@ -1267,5 +1279,5 @@ EngineResult AlgebraicParser::HandlePlotFunction(const std::string& input) {
     // For now, return a special string result to indicate this is a plot command
     // The actual plotting will be handled by the CalcEngine
     std::string plot_command = "PLOT_FUNCTION:" + args[0] + "," + args[1] + "," + args[2] + "," + args[3] + "," + args[4];
-    return {EngineSuccessResult(plot_command), {}};
+    return EngineSuccessResult(plot_command);
 }

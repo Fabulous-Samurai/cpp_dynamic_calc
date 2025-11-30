@@ -80,7 +80,7 @@ EngineResult PythonEngine::ExecutePython(const std::string& code) {
         int result = PyRun_SimpleString(code.c_str());
         
         if (result == 0) {
-            return {EngineSuccessResult(std::string("Python code executed successfully")), {}};
+            return EngineSuccessResult(std::string("Python code executed successfully"));
         } else {
             SetErrorFromPython();
             return {{}, {EngineErrorResult(CalcErr::DomainError)}};
@@ -124,19 +124,19 @@ EngineResult PythonEngine::EvaluatePython(const std::string& expression) {
                 SetErrorFromPython();
                 return {{}, {EngineErrorResult(CalcErr::DomainError)}};
             }
-            return {EngineSuccessResult(value), {}};
+            return EngineSuccessResult(value);
         }
         else if (PyList_Check(result_obj)) {
             std::vector<double> vec = PyListToVector(result_obj);
             if (!last_error_.empty()) {
                 return {{}, {EngineErrorResult(CalcErr::DomainError)}};
             }
-            return {EngineSuccessResult(vec), {}};
+            return EngineSuccessResult(vec);
         }
         else {
             // Convert to string representation
             std::string str_result = PyObjectToString(result_obj);
-            return {EngineSuccessResult(str_result), {}};
+            return EngineSuccessResult(str_result);
         }
 
     } catch (...) {
@@ -194,7 +194,7 @@ EngineResult PythonEngine::CreateNumpyArray(const std::vector<double>& data) {
         int result = PyRun_SimpleString("import numpy as np; temp_array = np.array(temp_data)");
         
         if (result == 0) {
-            return {EngineSuccessResult(std::string("NumPy array created successfully")), {}};
+            return EngineSuccessResult(std::string("NumPy array created successfully"));
         } else {
             SetErrorFromPython();
             return {{}, {EngineErrorResult(CalcErr::DomainError)}};
@@ -227,7 +227,7 @@ EngineResult PythonEngine::MatplotlibPlot(const std::string& expression, double 
         int result = PyRun_SimpleString(plot_code.str().c_str());
         
         if (result == 0) {
-            return {EngineSuccessResult(std::string("Plot created successfully. Use plt.show() to display.")), {}};
+            return EngineSuccessResult(std::string("Plot created successfully. Use plt.show() to display."));
         } else {
             SetErrorFromPython();
             return {{}, {EngineErrorResult(CalcErr::DomainError)}};

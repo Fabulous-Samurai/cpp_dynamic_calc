@@ -60,7 +60,7 @@ public:
         STARTING,
         READY,
         BUSY,
-        ERROR,
+        DAEMON_ERROR,
         SHUTDOWN
     };
 

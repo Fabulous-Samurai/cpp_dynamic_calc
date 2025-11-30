@@ -168,5 +168,5 @@ private:
     EngineResult HandlePlotFunction(const std::string& input);
     
     EngineResult SolveQuadratic(double a, double b, double c);
-    EngineResult SolveNonLinearSystem(const std::vector<std::string>& equations, std::map<std::string, double>& guess);
+    EngineResult SolveNonLinearSystem(const std::vector<std::string>& equations, std::map<std::string, AXIOM::Number>& guess);
 };

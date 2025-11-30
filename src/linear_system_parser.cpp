@@ -189,7 +189,7 @@ EngineResult LinearSystemParser::HandleQR(const std::string &input)
     if (Q.empty())
         return {{}, {LinAlgErr::NoSolution}};
 
-    return {EngineSuccessResult(Q), {}};
+    return EngineSuccessResult(Q);
 }
 
 EngineResult LinearSystemParser::HandleEigen(const std::string &input)
@@ -212,7 +212,7 @@ EngineResult LinearSystemParser::HandleEigen(const std::string &input)
 
     auto [eigenValues, eigenVectors] = ComputeEigenvalues(A, 100);
 
-    return {EngineSuccessResult(Vector(eigenValues)), {}};
+    return EngineSuccessResult(Vector(eigenValues));
 }
 
 EngineResult LinearSystemParser::HandleCramer(const std::string &input)
