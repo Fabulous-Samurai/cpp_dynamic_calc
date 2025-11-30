@@ -62,68 +62,68 @@ int main() {
     // Test 3: Revolutionary sqrt(-1) = i via Complex Operations
     std::cout << "Test 3: Revolutionary sqrt(-1) through EigenEngine\n";
     
-    auto sqrt_neg_one_result = engine.HandleComplexOperation(\"sqrt(-1)\");
+    auto sqrt_neg_one_result = engine.HandleComplexOperation("sqrt(-1)");
     if (sqrt_neg_one_result.HasResult()) {
-        std::cout << \"✅ sqrt(-1) handled successfully by EigenEngine!\n\";
+        std::cout << "✅ sqrt(-1) handled successfully by EigenEngine!\n";
         // The result would be stored in the EngineResult structure
-        std::cout << \"🎉 No more 'domain error' - complex numbers are first-class citizens!\n\n\";
+        std::cout << "🎉 No more 'domain error' - complex numbers are first-class citizens!\n\n";
     }
     
     // Test 4: Advanced Mathematical Operations Detection
-    std::cout << \"Test 4: Advanced Math Operation Detection\n\";
+    std::cout << "Test 4: Advanced Math Operation Detection\n";
     
-    bool is_eigenvalue_op = engine.IsAdvancedMathOperation(\"eigenvalue matrix\");
-    bool is_fft_op = engine.IsAdvancedMathOperation(\"fft signal\");
-    bool is_complex_op = engine.IsComplexOperation(\"complex phase\");
-    bool is_signal_op = engine.IsSignalProcessingOperation(\"filter frequency\");
+    bool is_eigenvalue_op = engine.IsAdvancedMathOperation("eigenvalue matrix");
+    bool is_fft_op = engine.IsAdvancedMathOperation("fft signal");
+    bool is_complex_op = engine.IsComplexOperation("complex phase");
+    bool is_signal_op = engine.IsSignalProcessingOperation("filter frequency");
     
-    std::cout << \"Eigenvalue operation detected: \" << (is_eigenvalue_op ? \"Yes\" : \"No\") << \"\\n\";
-    std::cout << \"FFT operation detected: \" << (is_fft_op ? \"Yes\" : \"No\") << \"\\n\";
-    std::cout << \"Complex operation detected: \" << (is_complex_op ? \"Yes\" : \"No\") << \"\\n\";
-    std::cout << \"Signal processing detected: \" << (is_signal_op ? \"Yes\" : \"No\") << \"\\n\\n\";
+    std::cout << "Eigenvalue operation detected: " << (is_eigenvalue_op ? "Yes" : "No") << "\n";
+    std::cout << "FFT operation detected: " << (is_fft_op ? "Yes" : "No") << "\n";
+    std::cout << "Complex operation detected: " << (is_complex_op ? "Yes" : "No") << "\n";
+    std::cout << "Signal processing detected: " << (is_signal_op ? "Yes" : "No") << "\n\n";
     
     // Test 5: Performance Metrics for Phase 3
-    std::cout << \"Test 5: Phase 3 Performance Metrics\\n\";
+    std::cout << "Test 5: Phase 3 Performance Metrics\n";
     
     auto metrics = engine.GetLastMetrics();
-    std::cout << \"Total operations: \" << metrics.total_operations << \"\\n\";
-    std::cout << \"Complex operations: \" << metrics.complex_operations << \"\\n\";
-    std::cout << \"Fast-path operations: \" << metrics.fast_path_operations << \"\\n\";
-    std::cout << \"FFT operations: \" << metrics.fft_operations << \"\\n\";
-    std::cout << \"Senna Speed ratio: \" << std::fixed << std::setprecision(2) << metrics.senna_speed_ratio << \"\\n\\n\";
+    std::cout << "Total operations: " << metrics.total_operations << "\n";
+    std::cout << "Complex operations: " << metrics.complex_operations << "\n";
+    std::cout << "Fast-path operations: " << metrics.fast_path_operations << "\n";
+    std::cout << "FFT operations: " << metrics.fft_operations << "\n";
+    std::cout << "Senna Speed ratio: " << std::fixed << std::setprecision(2) << metrics.senna_speed_ratio << "\n\n";
     
     // Test 6: Mathematical Constants Access
-    std::cout << \"Test 6: Mathematical Constants\\n\";
-    std::cout << \"Euler's number: \" << MathConstants::EULER_NUMBER << \"\\n\";
-    std::cout << \"Golden ratio: \" << MathConstants::GOLDEN_RATIO << \"\\n\";
-    std::cout << \"Imaginary unit i: \";
+    std::cout << "Test 6: Mathematical Constants\n";
+    std::cout << "Euler's number: " << MathConstants::EULER_NUMBER << "\n";
+    std::cout << "Golden ratio: " << MathConstants::GOLDEN_RATIO << "\n";
+    std::cout << "Imaginary unit i: ";
     
     if (IsComplex(MathConstants::IMAGINARY_UNIT)) {
         auto i = GetComplex(MathConstants::IMAGINARY_UNIT);
-        std::cout << i.real() << \" + \" << i.imag() << \"i\\n\";
+        std::cout << i.real() << " + " << i.imag() << "i\n";
     }
-    std::cout << \"\\n\";
+    std::cout << "\n";
     
     // Test 7: Eigenvalue Calculation Demo
-    std::cout << \"Test 7: Eigenvalue Calculation\\n\";
+    std::cout << "Test 7: Eigenvalue Calculation\n";
     
-    auto eigenvalue_result = engine.HandleAdvancedMathOperation(\"eigenvalue\");
+    auto eigenvalue_result = engine.HandleAdvancedMathOperation("eigenvalue");
     if (eigenvalue_result.HasResult()) {
-        std::cout << \"✅ Eigenvalue calculation completed successfully!\\n\";
-        std::cout << \"🧮 Advanced linear algebra capabilities operational!\\n\\n\";
+        std::cout << "✅ Eigenvalue calculation completed successfully!\n";
+        std::cout << "🧮 Advanced linear algebra capabilities operational!\n\n";
     }
     
-    std::cout << \"=== ADVANCED MATHEMATICAL FUNCTIONS ACHIEVED! ===\\n\";
-    std::cout << \"✅ Complex number linear algebra with fast-path optimization\\n\";
-    std::cout << \"✅ Advanced mathematical function detection and routing\\n\";
-    std::cout << \"✅ FFT and signal processing infrastructure\\n\";
-    std::cout << \"✅ Eigenvalue and polynomial computation capabilities\\n\";
-    std::cout << \"✅ Performance metrics tracking for complex operations\\n\";
-    std::cout << \"✅ Mathematical constants library\\n\";
-    std::cout << \"✅ Hardware-accelerated SIMD operations for complex data\\n\";
-    std::cout << \"\\n🏎️ Senna Speed maintained for real number operations\\n\";
-    std::cout << \"🔢 Complex number support with revolutionary sqrt(-1) = i\\n\";
-    std::cout << \"🧮 Advanced mathematics ready for scientific computing\\n\";
+    std::cout << "=== ADVANCED MATHEMATICAL FUNCTIONS ACHIEVED! ===\n";
+    std::cout << "✅ Complex number linear algebra with fast-path optimization\n";
+    std::cout << "✅ Advanced mathematical function detection and routing\n";
+    std::cout << "✅ FFT and signal processing infrastructure\n";
+    std::cout << "✅ Eigenvalue and polynomial computation capabilities\n";
+    std::cout << "✅ Performance metrics tracking for complex operations\n";
+    std::cout << "✅ Mathematical constants library\n";
+    std::cout << "✅ Hardware-accelerated SIMD operations for complex data\n";
+    std::cout << "\n🏎️ Senna Speed maintained for real number operations\n";
+    std::cout << "🔢 Complex number support with revolutionary sqrt(-1) = i\n";
+    std::cout << "🧮 Advanced mathematics ready for scientific computing\n";
     
     return 0;
 }
