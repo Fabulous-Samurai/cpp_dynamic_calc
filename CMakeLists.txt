@@ -1,7 +1,31 @@
 cmake_minimum_required(VERSION 3.12)
 
 # FORCE NINJA GENERATOR - MAXIMUM SPEED BUILD SYSTEM
-set(CMAKE_GENERATOR "Ninja" CACHE STRING "Generator" FORCE)
+# By default prefer Ninja, but allow overriding for environments without Ninja.
+option(AXIOM_FORCE_NINJA "Force using Ninja build generator" ON)
+if(AXIOM_FORCE_NINJA)
+    # Try to verify that 'ninja' is available and is the real Ninja binary.
+    find_program(NINJA_EXECUTABLE ninja)
+    if(NOT NINJA_EXECUTABLE)
+        message(WARNING "AXIOM_FORCE_NINJA is ON but 'ninja' executable not found. Disabling AXIOM_FORCE_NINJA.")
+        set(AXIOM_FORCE_NINJA OFF CACHE BOOL "Force using Ninja build generator" FORCE)
+    else()
+        execute_process(COMMAND ${NINJA_EXECUTABLE} --version
+            RESULT_VARIABLE NINJA_RESULT
+            OUTPUT_VARIABLE NINJA_VERSION_OUTPUT
+            ERROR_VARIABLE NINJA_VERSION_ERROR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        # If running 'ninja --version' fails or indicates a non-ninja tool, disable forcing Ninja
+        if(NOT NINJA_RESULT EQUAL 0 OR NINJA_VERSION_OUTPUT MATCHES "GNU Make|make")
+            message(WARNING "AXIOM_FORCE_NINJA detected but 'ninja --version' failed or isn't Ninja. Disabling AXIOM_FORCE_NINJA.")
+            set(AXIOM_FORCE_NINJA OFF CACHE BOOL "Force using Ninja build generator" FORCE)
+        endif()
+    endif()
+endif()
+if(AXIOM_FORCE_NINJA)
+    set(CMAKE_GENERATOR "Ninja" CACHE STRING "Generator" FORCE)
+endif()
 
 # Project and Version
 project(axiom_engine VERSION 3.0.0)
@@ -58,9 +82,10 @@ if(Python_FOUND)
         message(WARNING "Eigen3 not found - some optimizations will be disabled")
     endif()
     
-    # Try to find nanobind
-    find_package(nanobind QUIET)
-    if(nanobind_FOUND)
+    # Try to find nanobind (only if nanobind is enabled)
+    if(NOT DEFINED ENABLE_NANOBIND OR ENABLE_NANOBIND)
+        find_package(nanobind QUIET)
+        if(nanobind_FOUND)
         set(ENABLE_NANOBIND ON)
         add_definitions(-DENABLE_NANOBIND)
         message(STATUS "Nanobind found and enabled")
@@ -77,6 +102,7 @@ if(Python_FOUND)
         set(ENABLE_NANOBIND ON)
         add_definitions(-DENABLE_NANOBIND)
         message(STATUS "Nanobind downloaded and enabled via FetchContent")
+    endif()
     endif()
     
     add_definitions(-DENABLE_PYTHON_FFI)
